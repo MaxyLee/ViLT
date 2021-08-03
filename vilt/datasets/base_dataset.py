@@ -67,7 +67,6 @@ class BaseDataset(torch.utils.data.Dataset):
             self.all_texts = list()
 
         self.index_mapper = dict()
-
         if text_column_name != "" and not self.image_only:
             j = 0
             for i, texts in enumerate(self.all_texts):

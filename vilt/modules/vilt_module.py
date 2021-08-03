@@ -74,6 +74,15 @@ class ViLTransformerSS(pl.LightningModule):
             )
             self.vqa_classifier.apply(objectives.init_weights)
 
+        if self.hparams.config["loss_names"]["ve"] > 0:
+            self.ve_classifier = nn.Sequential(
+                nn.Linear(hs, hs * 2),
+                nn.LayerNorm(hs * 2),
+                nn.GELU(),
+                nn.Linear(hs * 2, 3),
+            )
+            self.ve_classifier.apply(objectives.init_weights)
+
         if self.hparams.config["loss_names"]["nlvr2"] > 0:
             self.nlvr2_classifier = nn.Sequential(
                 nn.Linear(hs * 2, hs * 2),
@@ -205,6 +214,10 @@ class ViLTransformerSS(pl.LightningModule):
         if "vqa" in self.current_tasks:
             ret.update(objectives.compute_vqa(self, batch))
 
+        # Visual Entailment
+        if "ve" in self.current_tasks:
+            ret.update(objectives.compute_ve(self, batch))
+
         # Natural Language for Visual Reasoning 2
         if "nlvr2" in self.current_tasks:
             ret.update(objectives.compute_nlvr2(self, batch))
@@ -239,6 +252,9 @@ class ViLTransformerSS(pl.LightningModule):
 
         if self.hparams.config["loss_names"]["vqa"] > 0:
             ret.update(objectives.vqa_test_step(self, batch, output))
+        
+        # if self.hparams.config["loss_names"]["ve"] > 0:
+        #     ret.update(objectives.ve_test_step(self, batch, output))
 
         return ret
 
@@ -247,6 +263,10 @@ class ViLTransformerSS(pl.LightningModule):
 
         if self.hparams.config["loss_names"]["vqa"] > 0:
             objectives.vqa_test_wrapup(outs, model_name)
+
+        # if self.hparams.config["loss_names"]["ve"] > 0:
+        #     objectives.ve_test_wrapup(outs, model_name)
+
         vilt_utils.epoch_wrapup(self)
 
     def configure_optimizers(self):

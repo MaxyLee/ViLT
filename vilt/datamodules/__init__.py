@@ -4,6 +4,7 @@ from .coco_caption_karpathy_datamodule import CocoCaptionKarpathyDataModule
 from .conceptual_caption_datamodule import ConceptualCaptionDataModule
 from .sbu_datamodule import SBUCaptionDataModule
 from .vqav2_datamodule import VQAv2DataModule
+from .ve_datamodule import VEDataModule
 from .nlvr2_datamodule import NLVR2DataModule
 
 _datamodules = {
@@ -13,5 +14,6 @@ _datamodules = {
     "gcc": ConceptualCaptionDataModule,
     "sbu": SBUCaptionDataModule,
     "vqa": VQAv2DataModule,
+    "ve": VEDataModule,
     "nlvr2": NLVR2DataModule,
 }

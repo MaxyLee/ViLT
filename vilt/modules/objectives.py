@@ -304,10 +304,9 @@ def compute_vqa(pl_module, batch):
     vqa_targets = torch.zeros(
         len(vqa_logits), pl_module.hparams.config["vqav2_label_size"]
     ).to(pl_module.device)
-
+    
     vqa_labels = batch["vqa_labels"]
     vqa_scores = batch["vqa_scores"]
-
     for i, (_label, _score) in enumerate(zip(vqa_labels, vqa_scores)):
         for l, s in zip(_label, _score):
             vqa_targets[i, l] = s
@@ -332,6 +331,45 @@ def compute_vqa(pl_module, batch):
     )
     pl_module.log(f"vqa/{phase}/loss", loss)
     pl_module.log(f"vqa/{phase}/score", score)
+
+    return ret
+
+
+# TODO
+def compute_ve(pl_module, batch):
+    infer = pl_module.infer(batch, mask_text=False, mask_image=False)
+    ve_logits = pl_module.ve_classifier(infer["cls_feats"])
+    ve_targets = torch.zeros(
+        len(ve_logits), 3
+    ).to(pl_module.device)
+
+    ve_labels = batch["ve_labels"]
+    ve_scores = batch["ve_scores"]
+
+    for i, (_label, _score) in enumerate(zip(ve_labels, ve_scores)):
+        for l, s in zip(_label, _score):
+            ve_targets[i, l] = s
+
+    ve_loss = (
+        F.binary_cross_entropy_with_logits(ve_logits, ve_targets)
+        * ve_targets.shape[1]
+    )  
+
+    ret = {
+        "ve_loss": ve_loss,
+        "ve_logits": ve_logits,
+        "ve_targets": ve_targets,
+        "ve_labels": ve_labels,
+        "ve_scores": ve_scores,
+    }
+
+    phase = "train" if pl_module.training else "val"
+    loss = getattr(pl_module, f"{phase}_ve_loss")(ret["ve_loss"])
+    score = getattr(pl_module, f"{phase}_ve_score")(
+        ret["ve_logits"], ret["ve_targets"]
+    )
+    pl_module.log(f"ve/{phase}/loss", loss)
+    pl_module.log(f"ve/{phase}/score", score)
 
     return ret
 
