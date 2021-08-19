@@ -1,9 +1,8 @@
-import ipdb
 from .base_dataset import BaseDataset
 
 class VEDataset(BaseDataset):
     def __init__(self, *args, split="", **kwargs):
-        assert split in ["train", "val", "test"]
+        assert split in ["train", "val", "test", "train_da"]
         self.split = split
 
         names = [f"ve_{split}"]
@@ -37,7 +36,6 @@ class VEDataset(BaseDataset):
             labels = list()
             scores = list()
 
-        # TODO
         return {
             "image": image_tensor,
             "text": text,
