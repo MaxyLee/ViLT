@@ -73,7 +73,8 @@ def make_arrow(root, txt_root, img_root, dataset_root):
             if os.path.isfile(img_name):
                 img_names.append(img_name)
                 texts.append(txt.strip('\n'))
-            
+    
+    print(f'da size: {len(texts)}')
 
     bs_da = [
         path2rest_da(img_name, text, split) for img_name, text in tqdm(zip(img_names, texts))

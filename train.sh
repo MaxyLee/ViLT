@@ -1,6 +1,6 @@
 set -ex
 
-NUM_GPUS=1
+NUM_GPUS=4
 NUM_NODES=1
 PTM_DIR=/data/share/ViLT/pretrained/vilt_200k_mlm_itm.ckpt
 
@@ -22,13 +22,13 @@ VQAv2_DATA_DIR=/data/share/UNITER/origin_imgs/coco_original
 # finetune on SNLI-VE
 VE_DATA_DIR=/data/share/UNITER/origin_imgs/flickr30k
 
-CUDA_VISIBLE_DEVICES=4 python run.py with \
-    data_root=$VE_DATA_DIR \
-    num_gpus=$NUM_GPUS \
-    num_nodes=$NUM_NODES \
-    task_finetune_ve \
-    per_gpu_batchsize=64 \
-    load_path=$PTM_DIR
+# CUDA_VISIBLE_DEVICES=4 python run.py with \
+#     data_root=$VE_DATA_DIR \
+#     num_gpus=$NUM_GPUS \
+#     num_nodes=$NUM_NODES \
+#     task_finetune_ve \
+#     per_gpu_batchsize=64 \
+#     load_path=$PTM_DIR
 
 # finetune on NLVR2
 NLVR2_DATA_DIR=/data/share/ViLT/data/NLVR2
@@ -62,3 +62,14 @@ COCO_DATA_DIR=/data/share/UNITER/origin_imgs/coco_original
 #     task_finetune_irtr_coco_randaug \
 #     per_gpu_batchsize=4 \
 #     load_path=$PTM_DIR
+
+# finetune on CUB IR/TR
+CUB_DATA_DIR=/data/share/data/birds/cub_arrows
+
+CUDA_VISIBLE_DEVICES=0,1,2,3 python run.py with \
+    data_root=$CUB_DATA_DIR \
+    num_gpus=$NUM_GPUS \
+    num_nodes=$NUM_NODES \
+    task_finetune_irtr_cub \
+    per_gpu_batchsize=64 \
+    load_path=$PTM_DIR

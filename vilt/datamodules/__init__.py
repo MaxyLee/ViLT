@@ -6,6 +6,7 @@ from .sbu_datamodule import SBUCaptionDataModule
 from .vqav2_datamodule import VQAv2DataModule
 from .ve_datamodule import VEDataModule
 from .nlvr2_datamodule import NLVR2DataModule
+from .cub_datamodule import CubDataModule
 
 _datamodules = {
     "vg": VisualGenomeCaptionDataModule,
@@ -16,4 +17,5 @@ _datamodules = {
     "vqa": VQAv2DataModule,
     "ve": VEDataModule,
     "nlvr2": NLVR2DataModule,
+    "cub": CubDataModule,
 }
