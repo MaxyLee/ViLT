@@ -72,14 +72,19 @@ def config():
     test_only = False
 
     # below params varies with the environment
-    data_root = ""
+    data_root = "data"
     log_dir = "result"
     per_gpu_batchsize = 0  # you should define this manually with per_gpu_batch_size=#
     num_gpus = 1
     num_nodes = 1
     load_path = ""
-    num_workers = 8
+    num_workers = 32
     precision = 16
+
+    # wandb configs
+    wandb_save_dir = "/data2/share/logs/wandb"
+    wandb_project = "vilt"
+    wandb_entity = "carboncoo"
 
 
 # Named configs for "environment" which define gpus and nodes, and paths

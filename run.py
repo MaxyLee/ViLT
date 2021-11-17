@@ -25,9 +25,16 @@ def main(_config):
         mode="max",
         save_last=True,
     )
-    logger = pl.loggers.TensorBoardLogger(
-        _config["log_dir"],
-        name=f'{exp_name}_seed{_config["seed"]}_from_{_config["load_path"].split("/")[-1][:-5]}',
+    # logger = pl.loggers.TensorBoardLogger(
+    #     _config["log_dir"],
+    #     name=f'{exp_name}_seed{_config["seed"]}_from_{_config["load_path"].split("/")[-1][:-5]}',
+    # )
+
+    logger = pl.loggers.WandbLogger(
+        save_dir=_config["wandb_save_dir"],
+        project=_config["wandb_project"],
+        entity=_config["wandb_entity"],
+        name=exp_name
     )
 
     lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
@@ -65,6 +72,7 @@ def main(_config):
         weights_summary="top",
         fast_dev_run=_config["fast_dev_run"],
         val_check_interval=_config["val_check_interval"],
+        plugins=pl.plugins.DDPPlugin(find_unused_parameters=False)
     )
 
     if not _config["test_only"]:
