@@ -1,16 +1,26 @@
 set -ex
 
-NUM_GPUS=4
+NUM_GPUS=2
 NUM_NODES=1
 PTM_DIR=/data/share/ViLT/pretrained/vilt_200k_mlm_itm.ckpt
 
 export MASTER_ADDR=127.0.0.1
-export MASTER_PORT=2334
+export MASTER_PORT=2333
 export NODE_RANK=0
 
 # finetune on VQAv2
 VQAv2_DATA_DIR=/data/share/UNITER/origin_imgs/coco_original
 
+# base
+# CUDA_VISIBLE_DEVICES=4,5 python run.py with \
+#     data_root=$VQAv2_DATA_DIR \
+#     num_gpus=$NUM_GPUS \
+#     num_nodes=$NUM_NODES \
+#     task_finetune_vqa \
+#     per_gpu_batchsize=64 \
+#     load_path=$PTM_DIR
+
+# img aug
 # python run.py with \
 #     data_root=$VQAv2_DATA_DIR \
 #     num_gpus=$NUM_GPUS \
@@ -33,6 +43,16 @@ VE_DATA_DIR=/data/share/UNITER/origin_imgs/flickr30k
 # finetune on NLVR2
 NLVR2_DATA_DIR=/data/share/ViLT/data/NLVR2
 
+# base(no aug)
+# python run.py with \
+#     data_root=$NLVR2_DATA_DIR \
+#     num_gpus=$NUM_GPUS \
+#     num_nodes=$NUM_NODES \
+#     task_finetune_nlvr2 \
+#     per_gpu_batchsize=32 \
+#     load_path=$PTM_DIR
+
+# img aug
 # python run.py with \
 #     data_root=$NLVR2_DATA_DIR \
 #     num_gpus=$NUM_GPUS \
@@ -40,6 +60,15 @@ NLVR2_DATA_DIR=/data/share/ViLT/data/NLVR2
 #     task_finetune_nlvr2_randaug \
 #     per_gpu_batchsize=32 \
 #     load_path=$PTM_DIR
+
+# txt aug
+CUDA_VISIBLE_DEVICES=2,3 python run.py with \
+    data_root=$NLVR2_DATA_DIR \
+    num_gpus=$NUM_GPUS \
+    num_nodes=$NUM_NODES \
+    task_finetune_nlvr2_txtaug \
+    per_gpu_batchsize=32 \
+    load_path=$PTM_DIR
 
 # finetune on F30K IR/TR
 F30K_DATA_DIR=/data/share/UNITER/origin_imgs/flickr30k
@@ -66,10 +95,10 @@ COCO_DATA_DIR=/data/share/UNITER/origin_imgs/coco_original
 # finetune on CUB IR/TR
 CUB_DATA_DIR=/data/share/data/birds/cub_arrows
 
-CUDA_VISIBLE_DEVICES=0,1,2,3 python run.py with \
-    data_root=$CUB_DATA_DIR \
-    num_gpus=$NUM_GPUS \
-    num_nodes=$NUM_NODES \
-    task_finetune_irtr_cub_randaug \
-    per_gpu_batchsize=8 \
-    load_path=$PTM_DIR
+# CUDA_VISIBLE_DEVICES=0,1,2,3 python run.py with \
+#     data_root=$CUB_DATA_DIR \
+#     num_gpus=$NUM_GPUS \
+#     num_nodes=$NUM_NODES \
+#     task_finetune_irtr_cub_randaug \
+#     per_gpu_batchsize=8 \
+#     load_path=$PTM_DIR

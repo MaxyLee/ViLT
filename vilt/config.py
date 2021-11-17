@@ -42,6 +42,7 @@ def config():
     whole_word_masking = False
     mlm_prob = 0.15
     draw_false_text = 0
+    txt_aug = False
 
     # Transformer Setting
     vit = "vit_base_patch32_384"
@@ -149,6 +150,19 @@ def task_finetune_nlvr2_randaug():
     draw_false_image = 0
     learning_rate = 1e-4
 
+
+@ex.named_config
+def task_finetune_nlvr2_txtaug():
+    exp_name = "finetune_nlvr2"
+    datasets = ["nlvr2"]
+    txt_aug = True
+    loss_names = _loss_names({"nlvr2": 1})
+    batch_size = 128
+    max_epoch = 10
+    max_steps = None
+    warmup_steps = 0.1
+    draw_false_image = 0
+    learning_rate = 1e-4
 
 @ex.named_config
 def task_finetune_vqa():

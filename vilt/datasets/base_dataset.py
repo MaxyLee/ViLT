@@ -3,8 +3,10 @@ import torch
 import io
 import pyarrow as pa
 import os
+import nlpaug.augmenter.word as naw
 
 from PIL import Image
+from tqdm import tqdm
 from vilt.transforms import keys_to_transforms
 
 
@@ -18,6 +20,7 @@ class BaseDataset(torch.utils.data.Dataset):
         text_column_name: str = "",
         remove_duplicate=True,
         max_text_len=40,
+        txt_aug=False,
         draw_false_image=0,
         draw_false_text=0,
         image_only=False,
@@ -34,6 +37,7 @@ class BaseDataset(torch.utils.data.Dataset):
         self.text_column_name = text_column_name
         self.names = names
         self.max_text_len = max_text_len
+        self.txt_aug = txt_aug
         self.draw_false_image = draw_false_image
         self.draw_false_text = draw_false_text
         self.image_only = image_only
@@ -65,6 +69,16 @@ class BaseDataset(torch.utils.data.Dataset):
                 self.all_texts = list()
         else:
             self.all_texts = list()
+
+        # text augmentation
+        if self.split == 'train' and self.txt_aug:
+            self.back_translation_aug = naw.BackTranslationAug(
+                from_model_name='facebook/wmt19-en-de', 
+                to_model_name='facebook/wmt19-de-en'
+            )
+            self.da_texts = list()
+            for captions in tqdm(self.all_texts, desc='BT captions'):
+                self.da_texts.append([self.back_translation_aug.augment(cap) for cap in captions])
 
         self.index_mapper = dict()
         if text_column_name != "" and not self.image_only:
@@ -110,6 +124,8 @@ class BaseDataset(torch.utils.data.Dataset):
         index, caption_index = self.index_mapper[raw_index]
 
         text = self.all_texts[index][caption_index]
+        if self.split == 'train' and self.txt_aug and random.randint(0, 1) == 0:
+            text = self.da_texts[index][caption_index]
         encoding = self.tokenizer(
             text,
             padding="max_length",

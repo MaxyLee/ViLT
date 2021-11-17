@@ -36,6 +36,7 @@ class BaseDataModule(LightningDataModule):
         self.draw_false_image = _config["draw_false_image"]
         self.draw_false_text = _config["draw_false_text"]
         self.image_only = _config["image_only"]
+        self.txt_aug = _config["txt_aug"]
 
         self.train_transform_keys = (
             ["default_train"]
@@ -79,6 +80,7 @@ class BaseDataModule(LightningDataModule):
             split="train",
             image_size=self.image_size,
             max_text_len=self.max_text_len,
+            txt_aug=self.txt_aug,
             draw_false_image=self.draw_false_image,
             draw_false_text=self.draw_false_text,
             image_only=self.image_only,
