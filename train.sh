@@ -70,6 +70,6 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python run.py with \
     data_root=$CUB_DATA_DIR \
     num_gpus=$NUM_GPUS \
     num_nodes=$NUM_NODES \
-    task_finetune_irtr_cub \
-    per_gpu_batchsize=64 \
+    task_finetune_irtr_cub_randaug \
+    per_gpu_batchsize=8 \
     load_path=$PTM_DIR

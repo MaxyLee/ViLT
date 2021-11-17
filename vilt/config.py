@@ -267,6 +267,22 @@ def task_finetune_irtr_cub():
     learning_rate = 1e-4
     image_size = 256
 
+@ex.named_config
+def task_finetune_irtr_cub_randaug():
+    exp_name = "finetune_irtr_cub_randaug"
+    datasets = ["cub"]
+    train_transform_keys = ["pixelbert_randaug"]
+    loss_names = _loss_names({"itm": 0.5, "irtr": 1})
+    batch_size = 256
+    max_epoch = 50
+    max_steps = None
+    warmup_steps = 0.1
+    get_recall_metric = True
+    draw_false_text = 15
+    learning_rate = 5e-5
+    image_size = 256
+    drop_rate = 0.3
+
 # Named configs for "etc" which are orthogonal to "env" and "task", need to be added at the end
 
 

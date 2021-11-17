@@ -232,6 +232,7 @@ class ViLTransformerSS(pl.LightningModule):
         vilt_utils.set_task(self)
         output = self(batch)
         total_loss = sum([v for k, v in output.items() if "loss" in k])
+        self.log("train/total_loss", total_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
 
         return total_loss
 
@@ -241,6 +242,8 @@ class ViLTransformerSS(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         vilt_utils.set_task(self)
         output = self(batch)
+        total_loss = sum([v for k, v in output.items() if "loss" in k])
+        self.log("val/total_loss", total_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
 
     def validation_epoch_end(self, outs):
         vilt_utils.epoch_wrapup(self)
