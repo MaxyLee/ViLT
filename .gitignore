@@ -12,3 +12,6 @@ result
 weights/
 scripts/
 demos/
+data
+pretrained
+*.sh
