@@ -78,13 +78,14 @@ def config():
     num_gpus = 1
     num_nodes = 1
     load_path = ""
-    num_workers = 32
+    num_workers = 16
     precision = 16
 
     # wandb configs
     wandb_save_dir = "/data2/share/logs/wandb"
     wandb_project = "vilt"
     wandb_entity = "carboncoo"
+    wandb_id = None
 
 
 # Named configs for "environment" which define gpus and nodes, and paths

@@ -30,12 +30,20 @@ def main(_config):
     #     name=f'{exp_name}_seed{_config["seed"]}_from_{_config["load_path"].split("/")[-1][:-5]}',
     # )
 
-    logger = pl.loggers.WandbLogger(
-        save_dir=_config["wandb_save_dir"],
-        project=_config["wandb_project"],
-        entity=_config["wandb_entity"],
-        name=exp_name
-    )
+    if _config["test_only"]:
+        logger = False
+    else:
+        logger = pl.loggers.WandbLogger(
+            save_dir=_config["wandb_save_dir"],
+            project=_config["wandb_project"],
+            entity=_config["wandb_entity"],
+            name=exp_name,
+            id=_config["wandb_id"]
+        )
+
+    if _config["wandb_id"] is not None and _config["resume_from"] is None and not _config["test_only"]:
+        import glob
+        _config["resume_from"] = glob.glob(f'{_config["wandb_save_dir"]}/{_config["wandb_project"]}/{_config["wandb_id"]}/checkpoints/*.ckpt')[-1]
 
     lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
     callbacks = [checkpoint_callback, lr_callback]

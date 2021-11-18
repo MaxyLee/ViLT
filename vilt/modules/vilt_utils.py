@@ -48,27 +48,41 @@ def epoch_wrapup(pl_module):
     phase = "train" if pl_module.training else "val"
     the_metric = 0
 
-    if pl_module.hparams.config["get_recall_metric"] and not pl_module.training and pl_module.current_epoch % 3 == 2:
+    if pl_module.hparams.config["get_recall_metric"] and not pl_module.training and pl_module.current_epoch % 3 == 0:
         (ir_r1, ir_r5, ir_r10, tr_r1, tr_r5, tr_r10) = compute_irtr_recall(pl_module)
         print((ir_r1, ir_r5, ir_r10, tr_r1, tr_r5, tr_r10), pl_module.global_step)
-        pl_module.logger.experiment.add_scalar(
-            "recalls/ir_r1", ir_r1, pl_module.global_step
-        )
-        pl_module.logger.experiment.add_scalar(
-            "recalls/ir_r5", ir_r5, pl_module.global_step
-        )
-        pl_module.logger.experiment.add_scalar(
-            "recalls/ir_r10", ir_r10, pl_module.global_step
-        )
-        pl_module.logger.experiment.add_scalar(
-            "recalls/tr_r1", tr_r1, pl_module.global_step
-        )
-        pl_module.logger.experiment.add_scalar(
-            "recalls/tr_r5", tr_r5, pl_module.global_step
-        )
-        pl_module.logger.experiment.add_scalar(
-            "recalls/tr_r10", tr_r10, pl_module.global_step
-        )
+        if callable(getattr(pl_module.logger, 'log_metrics', None)):
+            # wandb logger
+            pl_module.logger.log_metrics(
+                {
+                    'recalls/ir_r1': ir_r1,
+                    'recalls/ir_r5': ir_r5,
+                    'recalls/ir_r10': ir_r10,
+                    "recalls/tr_r1": tr_r1,
+                    "recalls/tr_r5": tr_r5,
+                    "recalls/tr_r10": tr_r10
+                },
+                step=pl_module.global_step
+            )
+        else:
+            pl_module.logger.experiment.add_scalar(
+                "recalls/ir_r1", ir_r1, pl_module.global_step
+            )
+            pl_module.logger.experiment.add_scalar(
+                "recalls/ir_r5", ir_r5, pl_module.global_step
+            )
+            pl_module.logger.experiment.add_scalar(
+                "recalls/ir_r10", ir_r10, pl_module.global_step
+            )
+            pl_module.logger.experiment.add_scalar(
+                "recalls/tr_r1", tr_r1, pl_module.global_step
+            )
+            pl_module.logger.experiment.add_scalar(
+                "recalls/tr_r5", tr_r5, pl_module.global_step
+            )
+            pl_module.logger.experiment.add_scalar(
+                "recalls/tr_r10", tr_r10, pl_module.global_step
+            )
         the_metric += ir_r1.item() + tr_r1.item()
 
     for loss_name, v in pl_module.hparams.config["loss_names"].items():
