@@ -65,20 +65,14 @@ class BaseDataset(torch.utils.data.Dataset):
                     if remove_duplicate
                     else self.all_texts
                 )
+                # text augmentation
+                if self.split == 'train' and self.txt_aug:
+                    self.da_texts = self.table[f'{text_column_name}_da'].to_pandas().tolist()
+                    print(f'Text Augmentation mode. len:{len(self.da_texts)}')
             else:
                 self.all_texts = list()
         else:
             self.all_texts = list()
-
-        # text augmentation
-        if self.split == 'train' and self.txt_aug:
-            self.back_translation_aug = naw.BackTranslationAug(
-                from_model_name='facebook/wmt19-en-de', 
-                to_model_name='facebook/wmt19-de-en'
-            )
-            self.da_texts = list()
-            for captions in tqdm(self.all_texts, desc='BT captions'):
-                self.da_texts.append([self.back_translation_aug.augment(cap) for cap in captions])
 
         self.index_mapper = dict()
         if text_column_name != "" and not self.image_only:

@@ -7,7 +7,7 @@ class VQAv2Dataset(BaseDataset):
         self.split = split
 
         if split == "train":
-            names = ["vqav2_train", "vqav2_trainable_val"]
+            names = ["vqav2_train", "vqav2_trainable_val"] if not kwargs['txt_aug'] else ["vqav2_train_da", "vqav2_trainable_val_da"]
         elif split == "val":
             names = ["vqav2_rest_val"]
         elif split == "test":

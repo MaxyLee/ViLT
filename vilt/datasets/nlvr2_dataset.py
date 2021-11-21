@@ -9,7 +9,7 @@ class NLVR2Dataset(BaseDataset):
         self.split = split
 
         if split == "train":
-            names = ["nlvr2_train"]
+            names = ["nlvr2_train"] if not kwargs['txt_aug'] else ["nlvr2_train_da"]
         elif split == "val":
             names = ["nlvr2_dev", "nlvr2_test1"]
         elif split == "test":

@@ -83,7 +83,7 @@ def config():
     precision = 16
 
     # wandb configs
-    wandb_save_dir = "/data2/share/logs/wandb"
+    wandb_save_dir = "/data/share/logs/wandb"
     wandb_project = "vilt"
     wandb_entity = "carboncoo"
 
@@ -199,6 +199,21 @@ def task_finetune_vqa_randaug():
     val_check_interval = 0.1
     lr_mult = 10
 
+
+@ex.named_config
+def task_finetune_vqa_txtaug():
+    exp_name = "finetune_vqa"
+    datasets = ["vqa"]
+    txt_aug = True
+    loss_names = _loss_names({"vqa": 1})
+    batch_size = 256
+    max_epoch = 10
+    max_steps = None
+    warmup_steps = 0.1
+    draw_false_image = 0
+    learning_rate = 1e-4
+    val_check_interval = 0.1
+    lr_mult = 10
 
 @ex.named_config
 def task_finetune_ve():
