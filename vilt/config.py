@@ -170,6 +170,20 @@ def task_finetune_nlvr2_txtaug():
     learning_rate = 1e-4
 
 @ex.named_config
+def task_finetune_nlvr2_aug():
+    exp_name = "finetune_nlvr2"
+    datasets = ["nlvr2"]
+    train_transform_keys = ["pixelbert_randaug"]
+    txt_aug = True
+    loss_names = _loss_names({"nlvr2": 1})
+    batch_size = 128
+    max_epoch = 10
+    max_steps = None
+    warmup_steps = 0.1
+    draw_false_image = 0
+    learning_rate = 1e-4
+
+@ex.named_config
 def task_finetune_vqa():
     exp_name = "finetune_vqa"
     datasets = ["vqa"]

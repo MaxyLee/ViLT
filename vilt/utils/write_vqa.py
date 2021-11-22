@@ -83,6 +83,8 @@ def path2rest(path, split, annotations, label2ans):
 
 
 def make_arrow(root, dataset_root):
+    random.seed(0)
+    
     with open(f"{root}/v2_OpenEnded_mscoco_train2014_questions.json", "r") as fp:
         questions_train2014 = json.load(fp)["questions"]
     with open(f"{root}/v2_OpenEnded_mscoco_val2014_questions.json", "r") as fp:
@@ -106,12 +108,12 @@ def make_arrow(root, dataset_root):
 
     for split, questions in zip(
         [
-            "train", 
+            # "train", 
             "val", 
             # "test", 
             # "test-dev"
         ], [
-            questions_train2014_da,
+            # questions_train2014_da,
             questions_val2014_da,
             # questions_test2015,
             # questions_test_dev2015,
@@ -127,7 +129,7 @@ def make_arrow(root, dataset_root):
 
     for split, annots in zip(
         [
-            "train", 
+            # "train", 
             "val"
         ], [
             annotations_train2014, 
@@ -145,10 +147,10 @@ def make_arrow(root, dataset_root):
 
     for split, annots in zip(
         [
-            "train", 
+            # "train", 
             "val"
         ], [
-            annotations_train2014, 
+            # annotations_train2014, 
             annotations_val2014
         ],
     ):
@@ -174,7 +176,7 @@ def make_arrow(root, dataset_root):
             )
 
     for split in [
-        "train", 
+        # "train", 
         "val"
     ]:
         filtered_annot = dict()
@@ -188,7 +190,7 @@ def make_arrow(root, dataset_root):
         annotations[split] = filtered_annot
 
     for split in [
-        "train",
+        # "train",
         "val",
         # "test",
         # "test-dev",
@@ -258,9 +260,10 @@ def make_arrow(root, dataset_root):
         with pa.RecordBatchFileWriter(sink, df1.schema) as writer:
             writer.write_table(df1)
 
-    # with pa.OSFile(f"{dataset_root}/vqav2_rest_val.arrow", "wb") as sink:
-    #     with pa.RecordBatchFileWriter(sink, df2.schema) as writer:
-    #         writer.write_table(df2)
+    with pa.OSFile(f"{dataset_root}/vqav2_rest_val_da.arrow", "wb") as sink:
+        with pa.RecordBatchFileWriter(sink, df2.schema) as writer:
+            writer.write_table(df2)
+
 if __name__ == '__main__':
     root='/data/share/UNITER/origin_imgs/coco_original'
     make_arrow(root, root)

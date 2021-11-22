@@ -66,7 +66,7 @@ class BaseDataset(torch.utils.data.Dataset):
                     else self.all_texts
                 )
                 # text augmentation
-                if self.split == 'train' and self.txt_aug:
+                if self.split == 'train' and self.txt_aug and f'{text_column_name}_da' in self.table:
                     self.da_texts = self.table[f'{text_column_name}_da'].to_pandas().tolist()
                     print(f'Text Augmentation mode. len:{len(self.da_texts)}')
             else:
@@ -118,7 +118,7 @@ class BaseDataset(torch.utils.data.Dataset):
         index, caption_index = self.index_mapper[raw_index]
 
         text = self.all_texts[index][caption_index]
-        if self.split == 'train' and self.txt_aug and random.randint(0, 1) == 0:
+        if self.split == 'train' and self.txt_aug and hasattr(self, 'da_texts') and random.randint(0, 1) == 0:
             text = self.da_texts[index][caption_index]
         encoding = self.tokenizer(
             text,
