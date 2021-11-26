@@ -3,7 +3,6 @@ import torch
 import io
 import pyarrow as pa
 import os
-import nlpaug.augmenter.word as naw
 
 from PIL import Image
 from tqdm import tqdm

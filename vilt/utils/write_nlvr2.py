@@ -10,9 +10,7 @@ from collections import defaultdict
 def back_translation(root):
     back_translation_aug = naw.BackTranslationAug(from_model_name='facebook/wmt19-en-de', to_model_name='facebook/wmt19-de-en', device='cuda:2')
 
-    train_data = list(
-        map(json.loads, open(f"{root}/nlvr2/data/train.json").readlines())
-    )
+    train_data = list(map(json.loads, open(f"{root}/nlvr2/data/train.json").readlines()))
 
     with open(f'{root}/nlvr2/data/train_da.json', 'w') as fout:
         data = []

@@ -158,7 +158,7 @@ def task_finetune_nlvr2_randaug():
 
 @ex.named_config
 def task_finetune_nlvr2_txtaug():
-    exp_name = "finetune_nlvr2"
+    exp_name = "finetune_nlvr2_txtaug"
     datasets = ["nlvr2"]
     txt_aug = True
     loss_names = _loss_names({"nlvr2": 1})
@@ -171,7 +171,7 @@ def task_finetune_nlvr2_txtaug():
 
 @ex.named_config
 def task_finetune_nlvr2_aug():
-    exp_name = "finetune_nlvr2"
+    exp_name = "finetune_nlvr2_aug"
     datasets = ["nlvr2"]
     train_transform_keys = ["pixelbert_randaug"]
     txt_aug = True
@@ -216,7 +216,7 @@ def task_finetune_vqa_randaug():
 
 @ex.named_config
 def task_finetune_vqa_txtaug():
-    exp_name = "finetune_vqa"
+    exp_name = "finetune_vqa_txtaug"
     datasets = ["vqa"]
     txt_aug = True
     loss_names = _loss_names({"vqa": 1})
@@ -243,6 +243,20 @@ def task_finetune_ve():
     val_check_interval = 0.1
     lr_mult = 10
 
+@ex.named_config
+def task_finetune_ve_randaug():
+    exp_name = "finetune_ve_randaug"
+    datasets = ["ve"]
+    train_transform_keys = ["pixelbert_randaug"]
+    loss_names = _loss_names({"ve": 1})
+    batch_size = 256
+    max_epoch = 10
+    max_steps = None
+    warmup_steps = 0.1
+    draw_false_image = 0
+    learning_rate = 1e-4
+    val_check_interval = 0.1
+    lr_mult = 10
 
 @ex.named_config
 def task_finetune_irtr_coco():
@@ -272,6 +286,19 @@ def task_finetune_irtr_coco_randaug():
     draw_false_text = 15
     learning_rate = 1e-4
 
+@ex.named_config
+def task_finetune_irtr_coco_sub_randaug():
+    exp_name = "finetune_irtr_coco_sub_randaug"
+    datasets = ["coco_sub"]
+    train_transform_keys = ["pixelbert_randaug"]
+    loss_names = _loss_names({"itm": 0.5, "irtr": 1})
+    batch_size = 256
+    max_epoch = 10
+    max_steps = None
+    warmup_steps = 0.1
+    get_recall_metric = True
+    draw_false_text = 15
+    learning_rate = 1e-4
 
 @ex.named_config
 def task_finetune_irtr_f30k():

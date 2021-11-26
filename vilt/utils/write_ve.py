@@ -17,6 +17,10 @@ label_dict = {
 
 img_pattern = re.compile(r"[0-9]*?.jpg")
 
+def back_translation(root):
+    with open(f"{root}/snli_1.0/snli_1.0_train.jsonl", "r") as fp:
+        snli_train = [json.loads(jline) for jline in fp]
+
 def path2rest(root, split, img_name, row):
     texts = [r['sentence2'] for r in row if r['gold_label'] != '-']
     labels = [[label_dict[r['gold_label']]] for r in row if r['gold_label'] != '-']

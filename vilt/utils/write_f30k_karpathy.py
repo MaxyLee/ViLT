@@ -3,11 +3,21 @@ import pandas as pd
 import pyarrow as pa
 import random
 import os
+import nlpaug.augmenter.word as naw
 
 from tqdm import tqdm
 from glob import glob
 from collections import defaultdict
 
+
+
+def back_translation(root):
+    back_translation_aug = naw.BackTranslationAug(from_model_name='facebook/wmt19-en-de', to_model_name='facebook/wmt19-de-en', device='cuda:2')
+
+    with open(f"{root}/karpathy/dataset_flickr30k.json", "r") as fp:
+        captions = json.load(fp)
+
+    captions = captions["images"]
 
 def path2rest(path, iid2captions, iid2split):
     name = path.split("/")[-1]
