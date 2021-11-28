@@ -5,6 +5,7 @@ import pyarrow as pa
 import os
 
 from PIL import Image
+from tqdm import tqdm
 from vilt.transforms import keys_to_transforms
 
 
@@ -18,6 +19,7 @@ class BaseDataset(torch.utils.data.Dataset):
         text_column_name: str = "",
         remove_duplicate=True,
         max_text_len=40,
+        txt_aug=False,
         draw_false_image=0,
         draw_false_text=0,
         image_only=False,
@@ -34,6 +36,7 @@ class BaseDataset(torch.utils.data.Dataset):
         self.text_column_name = text_column_name
         self.names = names
         self.max_text_len = max_text_len
+        self.txt_aug = txt_aug
         self.draw_false_image = draw_false_image
         self.draw_false_text = draw_false_text
         self.image_only = image_only
@@ -61,6 +64,10 @@ class BaseDataset(torch.utils.data.Dataset):
                     if remove_duplicate
                     else self.all_texts
                 )
+                # text augmentation
+                if self.split == 'train' and self.txt_aug and f'{text_column_name}_da' in self.table:
+                    self.da_texts = self.table[f'{text_column_name}_da'].to_pandas().tolist()
+                    print(f'Text Augmentation mode. len:{len(self.da_texts)}')
             else:
                 self.all_texts = list()
         else:
@@ -110,6 +117,8 @@ class BaseDataset(torch.utils.data.Dataset):
         index, caption_index = self.index_mapper[raw_index]
 
         text = self.all_texts[index][caption_index]
+        if self.split == 'train' and self.txt_aug and hasattr(self, 'da_texts') and random.randint(0, 1) == 0:
+            text = self.da_texts[index][caption_index]
         encoding = self.tokenizer(
             text,
             padding="max_length",

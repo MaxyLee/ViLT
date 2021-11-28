@@ -541,13 +541,16 @@ def compute_irtr_recall(pl_module):
 
     for img_batch in tqdm.tqdm(image_preload, desc="rank loop"):
         _ie, _im, _iid = img_batch
-        _, l, c = _ie.shape
+        b, l, c = _ie.shape
 
         img_batch_score = list()
         for txt_batch in text_preload:
             fblen = len(txt_batch["text_ids"])
+
             ie = _ie.expand(fblen, l, c)
             im = _im.expand(fblen, l)
+            # ie = torch.repeat_interleave(_ie, torch.tensor([fblen]*b,device=_ie.device), dim=0)
+            # im = torch.repeat_interleave(_im, torch.tensor([fblen]*b,device=_im.device), dim=0)
 
             with torch.cuda.amp.autocast():
                 score = pl_module.rank_output(
@@ -562,11 +565,17 @@ def compute_irtr_recall(pl_module):
                     )["cls_feats"]
                 )[:, 0]
 
-            img_batch_score.append(score)
+            scores = torch.split(score, fblen)
+            for s in scores:
+                img_batch_score.append(s)
 
         img_batch_score = torch.cat(img_batch_score)
         rank_scores.append(img_batch_score.cpu().tolist())
         rank_iids.append(_iid)
+        # import ipdb; ipdb.set_trace()
+        # rank_scores.extend(img_batch_score.cpu().tolist())
+        # rank_iids.extend(_iid)
+        # import ipdb; ipdb.set_trace()
 
     torch.distributed.barrier()
     gather_rank_scores = all_gather(rank_scores)

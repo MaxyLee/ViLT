@@ -2,13 +2,33 @@ import json
 import pandas as pd
 import pyarrow as pa
 import os
+import nlpaug.augmenter.word as naw
 
 from tqdm import tqdm
 from collections import defaultdict
 
+def back_translation(root):
+    back_translation_aug = naw.BackTranslationAug(from_model_name='facebook/wmt19-en-de', to_model_name='facebook/wmt19-de-en', device='cuda:2')
+
+    train_data = list(map(json.loads, open(f"{root}/nlvr2/data/train.json").readlines()))
+
+    with open(f'{root}/nlvr2/data/train_da.json', 'w') as fout:
+        data = []
+        for l in tqdm(train_data, desc='back translation'):
+            data.append(l)
+            if len(data) == 21:
+                texts = [d['sentence'] for d in data]
+                da_texts = back_translation_aug.augment(texts)
+                for i, d in enumerate(data):
+                    d.update({'sentence_da': da_texts[i]})
+                    json.dump(d, fout)
+                    fout.write('\n')
+                data = []
+
 
 def process(root, iden, row):
     texts = [r["sentence"] for r in row]
+    da_texts = [r["sentence_da"] for r in row]
     labels = [r["label"] for r in row]
 
     split = iden.split("-")[0]
@@ -24,12 +44,12 @@ def process(root, iden, row):
     with open(f"{path}-img1.png", "rb") as fp:
         img1 = fp.read()
 
-    return [img0, img1, texts, labels, iden]
+    return [img0, img1, texts, da_texts, labels, iden]
 
 
 def make_arrow(root, dataset_root):
     train_data = list(
-        map(json.loads, open(f"{root}/nlvr2/data/train.json").readlines())
+        map(json.loads, open(f"{root}/nlvr2/data/train_da.json").readlines())
     )
     test1_data = list(
         map(json.loads, open(f"{root}/nlvr2/data/test1.json").readlines())
@@ -64,12 +84,12 @@ def make_arrow(root, dataset_root):
 
     splits = [
         "train",
-        "dev",
-        "test1",
-        "balanced_dev",
-        "balanced_test1",
-        "unbalanced_dev",
-        "unbalanced_test1",
+        # "dev",
+        # "test1",
+        # "balanced_dev",
+        # "balanced_test1",
+        # "unbalanced_dev",
+        # "unbalanced_test1",
     ]
 
     datas = [
@@ -96,12 +116,12 @@ def make_arrow(root, dataset_root):
         ]
 
         dataframe = pd.DataFrame(
-            bs, columns=["image_0", "image_1", "questions", "answers", "identifier"],
+            bs, columns=["image_0", "image_1", "questions", "questions_da", "answers", "identifier"],
         )
 
         table = pa.Table.from_pandas(dataframe)
 
         os.makedirs(dataset_root, exist_ok=True)
-        with pa.OSFile(f"{dataset_root}/nlvr2_{split}.arrow", "wb") as sink:
+        with pa.OSFile(f"{dataset_root}/nlvr2_{split}_da.arrow", "wb") as sink:
             with pa.RecordBatchFileWriter(sink, table.schema) as writer:
                 writer.write_table(table)

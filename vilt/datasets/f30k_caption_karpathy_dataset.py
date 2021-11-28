@@ -4,6 +4,7 @@ from .base_dataset import BaseDataset
 class F30KCaptionKarpathyDataset(BaseDataset):
     def __init__(self, *args, split="", **kwargs):
         assert split in ["train", "val", "test"]
+        self.split = split
 
         if split == "train":
             names = ["f30k_caption_karpathy_train", "f30k_caption_karpathy_val"]
