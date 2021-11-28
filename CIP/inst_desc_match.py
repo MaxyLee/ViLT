@@ -59,7 +59,7 @@ class IDMAnn:
                 'inst_id': ann['id'],
                 'bbox': ann['bbox'],
                 'object_template_captions': template_captions(captions_tokens, ann['inst_desc_map']), # ['A man standing', 'next', 'to', '[TPL]', 'on', 'the', 'ground', '.']
-                'subject_template_captions': None
+                'subject_template_captions': None # ['[TPL] on the ground .']
             }
             all_templates.append(template)
         return all_templates
@@ -80,7 +80,8 @@ class IDMAnn:
                 'object_descs': all_descs, # ['a dog', 'a small puppy']
                 'subject_descs': None,     # ['a dog jumping', 'a small puppy playing with a frisbee']
                 'attr': {
-                    'category': ann['category'],
+                    'category': ann['category'], # {supercategory, ..}
+                    'vbg': None
                 }
             }
             all_instances.append(instance)

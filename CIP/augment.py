@@ -30,6 +30,8 @@ def inst_match_score(src_inst, tgt_inst):
     src_mask = Image.fromarray(src_mask)
     src_mask = np.array(src_mask.resize(tgt_size))
     sim = (src_mask * tgt_mask).sum() / ((src_mask+tgt_mask) != 0).sum()
+
+    # VBG comparing
     return sim
 
 def augment_captions(template_captions, descs, size=5):
