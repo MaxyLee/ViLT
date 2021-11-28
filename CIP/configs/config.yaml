@@ -1,0 +1,31 @@
+inst_desc_match:
+  word2vec: /data2/private/cc/wheels/GoogleNews-vectors-negative300.bin
+  image_path: /data2/share/data/coco/images/val2017
+  caption_annotation: /data2/share/data/coco/annotations/captions_val2017.json
+  instance_annotation: /data2/share/data/coco/annotations/instances_val2017.json
+  output_dir: tmp/idm_results
+  categories: 
+    - dog
+  th_wordsim: 0.5
+
+crop_inpaint:
+  template_annotation: ${inst_desc_match.output_dir}/templates.json
+  template_path: tmp/origin_images
+  instance_annotation: /data2/share/data/coco/annotations/instances_val2017.json
+  inpaint:
+    code_path: /data2/private/cc/experiment/lama
+    model_path: /data2/private/cc/experiment/lama/big-lama
+    indir: ${crop_inpaint.template_path}
+    outdir: tmp/inpaint_images
+
+augment:
+  idm_dir: ${inst_desc_match.output_dir}
+  inpaint_dir: ${crop_inpaint.inpaint.outdir}
+  output_dir: tmp/augment_results
+  th_matchscore: 0.7
+
+evaluate:
+  data_dir: ${augment.output_dir}
+  output_path: ${augment.output_dir}/debug_scores.txt
+  device: 'cuda:0'
+  batch_size: 100

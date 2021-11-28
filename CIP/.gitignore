@@ -3,3 +3,6 @@
 *.pickle
 
 similar/
+tmp/
+test/
+outputs/

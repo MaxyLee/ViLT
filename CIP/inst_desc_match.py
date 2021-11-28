@@ -1,9 +1,11 @@
 import enum
+import json
+import pickle
 import os, random, copy, time
 import argparse
 from pycocotools.coco import COCO
 import skimage.io as io
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 import numpy as np
 import nltk
 from gensim import models
@@ -13,73 +15,67 @@ from omegaconf import OmegaConf
 
 from coco_utils import (
     bbox2xy, loadImage, loadCaptions,
-    image_vcat, image_hcat
+    image_vcat, image_hcat, draw_instance_bbox, draw_captions
 )
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-r",
-        "--resume",
+        "-c",
+        "--config",
         type=str,
-        const=True,
-        default="",
-        nargs="?",
-        required=True,
-        help="resume from logdir or checkpoint in logdir",
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        type=str,
-        default="sample",
-        help="path for samples output",
-    )
-    parser.add_argument(
-        "--gpus",
-        type=int,
-        nargs='*',
-        help="gpus",
+        default='configs/idm.yaml',
+        help="run instance-description matching with given configs",
     )
     return parser.parse_args()
 
 ############# Match Classes #############
 
+colornames = ['red', 'lightgreen', 'SandyBrown', 'RoyalBlue']
+
 class IDMAnn:
     """
     Instance-Description Matched Annotations for a single image
     """
-    def __init__(self, image_path, imgid, captions_tokens, mapped_anns, inpaint_image_path=None):
+    def __init__(self, image_path, imgid, templates, instances):
         self.image_path = image_path
-        self.inpaint_image_path = inpaint_image_path
         self.imgid = imgid
-        self.captions_tokens = captions_tokens
-        self.mapped_anns = mapped_anns
+        self.templates = templates
+        self.instances = instances
 
-    def get_templates(self):
+    @classmethod
+    def from_mapped_anns(cls, image_path, imgid, captions_tokens, mapped_anns):
+        all_templates = cls.get_templates(image_path, imgid, captions_tokens, mapped_anns)
+        all_instances = cls.get_instances(image_path, imgid, mapped_anns)
+
+        return cls(image_path, imgid, all_templates, all_instances)
+
+    @classmethod
+    def get_templates(cls, image_path, imgid, captions_tokens, mapped_anns):
         all_templates = []
-        for ann in self.mapped_anns:
+        for ann in mapped_anns:
             template = {
-                'image_path': self.image_path,
-                'imgid': self.imgid,
+                'imgid': imgid,
                 'inst_id': ann['id'],
-                'object_template_captions': template_captions(self.captions_tokens, ann['inst_desc_map']), # ['A man standing', 'next', 'to', '[TPL]', 'on', 'the', 'ground', '.']
+                'bbox': ann['bbox'],
+                'object_template_captions': template_captions(captions_tokens, ann['inst_desc_map']), # ['A man standing', 'next', 'to', '[TPL]', 'on', 'the', 'ground', '.']
                 'subject_template_captions': None
             }
             all_templates.append(template)
         return all_templates
 
-    def get_instances(self):
-        image = loadImage(self.image_path, self.imgid)
+    @classmethod
+    def get_instances(cls, image_path, imgid, mapped_anns):
+        image = loadImage(image_path, imgid)
         all_instances = []
-        for ann in self.mapped_anns:
+        for ann in mapped_anns:
             x1, y1, x2, y2 = bbox2xy(ann['bbox'])
             region = image.crop((x1, y1, x2, y2))
             mask = ann['mask'][y1:y2, x1:x2]
-            all_descs = [[xx[1] for x in ann['inst_desc_map'] for xx in x]]
+            all_descs = [xx[1].lower() for x in ann['inst_desc_map'] for xx in x]
             instance = {
                 'id': ann['id'],
-                'region': region,
+                'region': np.array(region),
                 'mask': mask,
                 'object_descs': all_descs, # ['a dog', 'a small puppy']
                 'subject_descs': None,     # ['a dog jumping', 'a small puppy playing with a frisbee']
@@ -90,22 +86,38 @@ class IDMAnn:
             all_instances.append(instance)
         return all_instances
 
-    def get_template_image(self, masked=False):
-        if masked and self.inpaint_image_path is not None:
-            image = loadImage(self.inpaint_image_path, self.imgid, fmt='{imgid}_mask.png')
-        else:
-            image = loadImage(self.image_path, self.imgid)
-        template_image = draw_template(image, self.mapped_anns, self.captions_tokens, masked=masked)
+    def draw_templates_image(self):
+        image = loadImage(self.image_path, self.imgid)
+        cnt = 0
+        all_template_captions = []
+        for template, color in zip(self.templates, colornames):
+            label = f"inst-{template['inst_id']}"
+            image = draw_instance_bbox(image, template['bbox'], color=color, label=label)
+            cnt += 1
+            all_template_captions.append((label, color, template['object_template_captions']))
+        
+        all_caption_images = []
+        for label, color, template_captions in all_template_captions:
+            caption_image = draw_captions(image.size[1], template_captions, title=label+':', color=color)
+            all_caption_images.append(caption_image)
+
+        template_image = image_hcat([image] + all_caption_images)
         return template_image
 
-    def get_instance_image(self, image=None):
+    def draw_instances_image(self, min_height=200, masked=True):
         image = loadImage(self.image_path, self.imgid)
-        all_instance_images = []
-        for ann in self.mapped_anns:
-            instance, _ = draw_instance(image, ann)
-            descs = [cap_pairs[0][1] for cap_pairs in ann['inst_desc_map'] if len(cap_pairs)]
-            desc_image = draw_captions(instance.size[1], descs)
-            instance_image = image_hcat([instance, desc_image])
+        all_instance_images = [image]
+        for instance in self.instances:
+            region = Image.fromarray(instance['region'])
+            mask = instance['mask']
+            descs = instance['object_descs']
+            if masked:
+                img = Image.new('RGB', region.size, (255, 255, 255))
+                img.paste(region, mask=Image.fromarray(mask*255))
+            else:
+                img = region
+            desc_image = draw_captions(max(img.size[1], min_height), descs)
+            instance_image = image_hcat([img, desc_image])
             all_instance_images.append(instance_image)
         return image_vcat(all_instance_images)
 
@@ -149,8 +161,8 @@ def noun_word2phrase(pos_tags, noun_ids):
 def location_parse(pos_tags):
     pass
 
-def inst_desc_match(config):
-    print('run instance-description matching')
+def run_inst_desc_match(config, output_dir=None):
+    print('[Run]: instance-description matching')
     print('loading word2vec model into memory...')
     t = time.time()
     word2vec = models.KeyedVectors.load_word2vec_format(config['word2vec'], binary=True)
@@ -234,9 +246,16 @@ def inst_desc_match(config):
             ann['category'] = instance_anns.cats[ann['category_id']]
             ann['mask'] = instance_anns.annToMask(ann)
 
-        idmAnn = IDMAnn(image_path, imgid, caption_tokens, mapped_anns)
+        idmAnn = IDMAnn.from_mapped_anns(image_path, imgid, caption_tokens, mapped_anns)
         idmAnns.append(idmAnn)
 
+    if output_dir is not None:
+        os.makedirs(output_dir, exist_ok=True)
+        save_idmanns(idmAnns, config, output_dir=output_dir)
+    elif 'output_dir' in config:
+        output_dir = config['output_dir']
+        os.makedirs(output_dir, exist_ok=True)
+        save_idmanns(idmAnns, config, output_dir=output_dir)
     return idmAnns
 
 ############# Visualization Functions #############
@@ -268,104 +287,16 @@ def template_captions(caption_tokens, inst_desc_mapping):
         annoted_captions.append(' '.join(annoted_caption))
     return annoted_captions
 
-def draw_instance_bbox(image, ann, color='red', label='bbox'):
-    """show instance bbox in the image
-    """
-    bbox = ann['bbox']
-    x1, y1, x2, y2 = bbox2xy(bbox)
-    
-    draw = ImageDraw.Draw(image)
-
-    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
-    label_size = draw.textsize(label, font)
-    text_origin = np.array([x1, y1-label_size[1]])
-
-    draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
-    draw.rectangle([tuple(text_origin), tuple(text_origin+label_size)], fill=color)
-    draw.text(text_origin, str(label), fill=(255,255,255), font=font)
-
-    del draw
-    return image
-
-def draw_captions(height, captions, title=None, color='black'):
-    """draw caption images with specified height and adaptive width
-    """
-    margin_left, margin_right = 10, 10
-    margin_between = 10
-
-    image = Image.new('RGB', (256, height), (255, 255, 255))
-
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
-
-    textsizes = [draw.textsize(caption, font) for caption in captions]
-    max_width = max([textsize[0] for textsize in textsizes])
-
-    total_height = sum([textsize[1] for textsize in textsizes])
-    total_height += len(textsizes) * margin_between
-    margin_top = int((height - total_height) / 2)
-
-    image = image.resize((max_width+margin_left+margin_right, height))
-    draw = ImageDraw.Draw(image)
-
-    text_origin = np.array([margin_left, margin_top])
-
-    if title is not None:
-        title_textsize = draw.textsize(title, font)
-        draw.text(text_origin, str(title), fill=color, font=font)
-        text_origin[1] += title_textsize[1] + margin_between
-
-    for caption, textsize in zip(captions, textsizes):
-        draw.text(text_origin, str(caption), fill=(0,0,0), font=font)
-        text_origin[1] += textsize[1] + margin_between
-
-    return image
-
-colornames = ['red', 'lightgreen', 'SandyBrown', 'RoyalBlue']
-
-def draw_template(image, mapped_anns, caption_tokens, masked=False):
-    """draw template image: image_hcat([image(instance marked), captions])
-    
-    Args:
-        masked (Bool): whether to mask out descriptions corresponding to instances
-    """
-    all_template_captions = {}
-    for ann, color in zip(mapped_anns, colornames):
-        ann_catname = f"{ann['category']['name']}-{ann['id']}"
-
-        image = draw_instance_bbox(image, ann, color=color, label=ann_catname)
-
-        annoted_captions = []
-        for caption, inst_desc_mapping in zip(caption_tokens, ann['inst_desc_map']):
-            caption = copy.copy(caption)
-            for ((l, r), _) in inst_desc_mapping:
-                if masked:
-                    caption[l:r] = ['_' for _ in range(r-l)]
-                else:
-                    caption[l] = '[TL] ' + caption[l]
-                    caption[r-1] = caption[r-1] + ' [TR]'
-            annoted_captions.append(caption)
-
-        all_template_captions[ann_catname] = (annoted_captions, color)
-    
-    all_caption_images = []
-    for k, (template_captions, color) in all_template_captions.items():
-        template_captions = [' '.join(x) for x in template_captions]
-        caption_image = draw_captions(image.size[1], template_captions, title=k+':', color=color)
-        all_caption_images.append(caption_image)
-    final_image = image_hcat([image] + all_caption_images)
-    return final_image
-
-def draw_instance(image, ann, min_height=200, bbox=False):
+def draw_instance(image, bbox, mask, min_height=200, masked=True):
     """draw instance image: image_hcat([instance(croped), descriptios])
     
     Args:
-        masked (Bool): whether to mask out descriptions corresponding to instances
+        masked (Bool): whether to mask out unrelated pixels in the bbox
     """
-    x1, y1, x2, y2 = bbox2xy(ann['bbox'])
+    x1, y1, x2, y2 = bbox2xy(bbox)
     region = image.crop((x1, y1, x2, y2))
-    mask = ann['mask'][y1:y2, x1:x2]
-    if bbox:
+    mask = mask[y1:y2, x1:x2]
+    if not masked:
         return region
     else:
         paste_bbox = [0, 0, x2-x1, y2-y1]
@@ -378,14 +309,67 @@ def draw_instance(image, ann, min_height=200, bbox=False):
         new_img.paste(region, box=paste_bbox, mask=Image.fromarray(mask*255))
         return new_img, mask
 
-def save_idmanns(idmanns):
-    pass
+def save_idmanns(idmAnns, config, output_dir='idm_results'):
+    print('saving results...')
+    OmegaConf.save(config, f'{output_dir}/config.yaml')
+    templates = {}
+    instances = {}
+    for idmAnn in idmAnns:
+        imgid = idmAnn.imgid
+        for idx, template in enumerate(idmAnn.templates):
+            templates[f"{imgid}-{template['inst_id']}"] = template
+        for idx, instance in enumerate(idmAnn.instances):
+            instances[f"{imgid}-{instance['id']}"] = instance
 
-def load_idmanns(idmanns):
-    pass
+    json.dump({'image_path': config['image_path'], 'templates': templates}, open(f'{output_dir}/templates.json', 'w'))
+    pickle.dump(instances, open(f'{output_dir}/instances.pickle', 'wb'))
+
+def load_idmanns(output_dir, return_anns=False):
+    config = OmegaConf.load(f'{output_dir}/config.yaml')
+    templates = json.load(open(f'{output_dir}/templates.json'))['templates']
+    instances = pickle.load(open(f'{output_dir}/instances.pickle', 'rb'))
+
+    if return_anns:
+        image_path = config['image_path']
+        image_anns = []
+        keys = sorted(list(templates.keys()))
+
+        tmp_key = keys[0]
+        tmp_imgid = int(tmp_key.split('-')[0])
+        tmp_templates = []
+        tmp_instances = []
+        for key in keys[1:]:
+            imgid = int(key.split('-')[0])
+            if imgid != tmp_imgid:
+                image_anns.append(IDMAnn(image_path, tmp_imgid, tmp_templates, tmp_instances))
+                tmp_imgid = imgid
+                tmp_templates = []
+                tmp_instances = []
+            else:
+                tmp_templates.append(templates[key])
+                tmp_instances.append(instances[key])
+        return image_anns
+    else:
+        return templates, instances, config
 
 if __name__ == '__main__':
-    config = OmegaConf.load('configs/idm.yaml')
-    idmAnns = inst_desc_match(config)
+    # args = parse_args()
+    # config = OmegaConf.load(args.config)
+    # idmAnns = run_inst_desc_match(config)
+    
+    # output_dir = config['output_dir']
+    # os.makedirs(output_dir, exist_ok=True)
+    # save_idmanns(idmAnns, config, output_dir=output_dir)
+
+    idmAnns = load_idmanns('tmp/idm_results')
+
+    # os.makedirs('test/templates', exist_ok=True)
+    # os.makedirs('test/instances', exist_ok=True)
+
+    # for idmAnn in idmAnns:
+    #     template = idmAnn.draw_templates_image()
+    #     instance = idmAnn.draw_instances_image()
+    #     template.save(f'test/templates/{idmAnn.imgid}.png')
+    #     instance.save(f'test/instances/{idmAnn.imgid}.png')
 
     import ipdb; ipdb.set_trace()

@@ -1,0 +1,8 @@
+template_annotation: /data2/private/cc/experiment/ViLT/CIP/tmp/new_idm_results/templates.json
+template_path: tmp/origin_images
+instance_annotation: /data2/share/data/coco/annotations/instances_val2017.json
+inpaint:
+  code_path: /data2/private/cc/experiment/lama
+  model_path: /data2/private/cc/experiment/lama/big-lama
+  indir: ${template_path}
+  outdir: tmp/inpaint_images
