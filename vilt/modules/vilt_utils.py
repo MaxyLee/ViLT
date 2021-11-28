@@ -64,7 +64,7 @@ def epoch_wrapup(pl_module):
                 },
                 step=pl_module.global_step
             )
-        else:
+        elif callable(getattr(pl_module.logger.experiment, 'add_scalar', None)):
             pl_module.logger.experiment.add_scalar(
                 "recalls/ir_r1", ir_r1, pl_module.global_step
             )

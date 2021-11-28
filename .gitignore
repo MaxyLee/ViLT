@@ -17,3 +17,8 @@ pretrained
 wandb/
 train.sh
 test.sh
+
+*categories/
+*samples/
+
+CIP/

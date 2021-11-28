@@ -1,4 +1,4 @@
-import argparse, os, sys, re, glob, math, time, json, random
+import argparse, os, sys, re, glob, math, time, json, random, functools
 
 from numpy.lib.function_base import iterable
 from pytorch_lightning.core import datamodule
@@ -19,6 +19,8 @@ import torchvision
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataloader import T, default_collate
+
+from vilt.modules.vilt_module import ViLTransformerSS
 
 import hydra
 
@@ -60,6 +62,10 @@ class VQATask:
 
         self.datasets = {}
 
+        self.collate = functools.partial(
+            self.datamodule.train_dataset.collate, mlm_collator=self.datamodule.mlm_collator,
+        )
+
     def load_dataset(self, aug_key='none', split='train'):
         transform_keys = aug2transform(aug_key)
         dataset = self.datamodule.dataset_cls(
@@ -86,6 +92,31 @@ class VQATask:
             'score': data['vqa_scores'],
         })
 
+    def test_example(self, pl_module, data):
+        batch = self.collate([data])
+        infer = pl_module.infer(batch, mask_text=False, mask_image=False)
+        vqa_logits = pl_module.vqa_classifier(infer["cls_feats"])
+        vqa_preds = vqa_logits.argmax(dim=-1)
+        vqa_scores = [vqa_logits[i, pred].item() for i, pred in enumerate(vqa_preds)]
+        vqa_preds = [self.id2answer[pred.item()] for pred in vqa_preds]
+        outputs = {
+            'preds': vqa_preds,
+            'scores': vqa_scores
+        }
+        return outputs
+
+        # id2answer = (
+        #     pl_module.trainer.datamodule.dm_dicts["vqa_trainval"].id2answer
+        #     if "vqa_trainval" in pl_module.trainer.datamodule.dm_dicts
+        #     else pl_module.trainer.datamodule.dm_dicts["vqa"].id2answer
+        # )
+        # vqa_logits = output["vqa_logits"]
+        # vqa_preds = vqa_logits.argmax(dim=-1)
+        # vqa_preds = [id2answer[pred.item()] for pred in vqa_preds]
+        # questions = batch["text"]
+        # qids = batch["qid"]
+
+
     def get_length(self, split='train'):
         return len(getattr(self.datamodule, f'{split}_dataset', []))
 
@@ -97,10 +128,11 @@ task_classes = {
 }
 
 hash_funcs = {
-    VQATask: lambda x: x.name
+    VQATask: lambda x: x.name,
+    ViLTransformerSS: lambda x: x.name
 }
 
-############ load funcs ############
+############ cached funcs ############
 
 @st.cache(allow_output_mutation=True, suppress_st_warning=True)
 def load_task(all_configs, task_name):
@@ -115,6 +147,16 @@ def load_dataset(task, aug_key='none', split='train'):
 def load_configs(config_path):
     configs = OmegaConf.load(config_path)
     return configs
+
+@st.cache(allow_output_mutation=True, suppress_st_warning=True)
+def load_models(all_configs, task_name, device='cpu'):
+    all_models = {}
+    for k, ckpt_path in all_configs[task_name]['models'].items():
+        all_models[k] = ViLTransformerSS.load_from_checkpoint(ckpt_path, map_location=device)
+        all_models[k].name = k
+    return all_models
+
+############ ui funcs ############
 
 def select_task(tasks):
     task = st.sidebar.selectbox('Select a task', options=tasks)
@@ -140,29 +182,27 @@ if __name__ == '__main__':
     args = parse_args()
     all_configs = load_configs(args.config)
 
+    # choose task
     task_name = select_task(list(all_configs.keys()))
     split, augs = select_dataset()
-
     selected_task = load_task(all_configs, task_name)
+
+    # load all datasets
     all_datasets = {}
     for aug in augs:
         all_datasets[f'{split}_{aug}'] = load_dataset(selected_task, aug_key=aug, split=split)
     
+    # load all models
+    all_models = load_models(all_configs, task_name)
+
     index = select_index(selected_task.get_length(split))
 
     cols = st.columns(len(all_datasets))
     for col, (k, v) in zip(cols, all_datasets.items()):
         with col:
             st.caption(k)
-            selected_task.display_example(v[index])
-
-    # split, aug = select_dataset()
-
-    # transform_keys = ['pixelbert']
-    # if aug == 'img':
-    #     transform_keys = ['pixelbert_randaug']
-
-    # dataset = load_dataset(all_configs[task]['dataset'], transform_keys=transform_keys, split=split)
-
-    # dataset = hydra.utils.instantiate(all_configs['VQA']['dataset'])
+            example = v[index]
+            selected_task.display_example(example)
+            for module_k, pl_module in all_models.items():
+                st.json(selected_task.test_example(pl_module, example))
     

@@ -16,3 +16,6 @@ VQA:
       per_gpu_batchsize: 1
       whole_word_masking: False
       mlm_prob: 0.15
+
+  models:
+    none: /data2/share/logs/wandb/vilt/sxh10vrz/checkpoints/epoch=9-step=24233.ckpt
