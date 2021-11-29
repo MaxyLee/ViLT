@@ -1,0 +1,21 @@
+VQA:
+  datamodule: 
+    _target_: vilt.datamodules.vqav2_datamodule.VQAv2DataModule
+    _config:
+      data_root: /data2/private/cc/experiment/ViLT/data/VQAv2
+      train_transform_keys: ['pixelbert']
+      val_transform_keys: ['pixelbert']
+      image_size: 384
+      max_text_len: 40
+      draw_false_image: 0
+      draw_false_text: 0
+      image_only: False
+      tokenizer: "bert-base-uncased"
+
+      num_workers: 1
+      per_gpu_batchsize: 1
+      whole_word_masking: False
+      mlm_prob: 0.15
+
+  models:
+    none: /data2/share/logs/wandb/vilt/sxh10vrz/checkpoints/epoch=9-step=24233.ckpt

@@ -14,4 +14,10 @@ scripts/
 demos/
 data
 pretrained
+wandb/
+train.sh
+test.sh
+
+*categories/
+*samples/
 *.sh
