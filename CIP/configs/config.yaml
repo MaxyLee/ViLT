@@ -1,3 +1,4 @@
+# data process
 preprocess:
   image_ids: /data2/share/data/coco/annotations/rand_ids.npy
   caption_annotation: 
@@ -8,7 +9,18 @@ preprocess:
     val: /data2/share/data/coco/annotations/instances_val2017.json
   output_dir: /data2/share/data/coco/annotations/small_dataset
 
-tmp_path: tmp/small-dataset/
+analysis:
+  instance_annotation: 
+    # train: /data2/share/data/coco/annotations/small_dataset/instances_train.json
+    # val: /data2/share/data/coco/annotations/small_dataset/instances_val.json
+    train: /data2/share/data/coco/annotations/instances_train2017.json
+    val: /data2/share/data/coco/annotations/instances_val2017.json
+  # output_dir: /data2/share/data/coco/annotations/small_dataset
+  output_dir: /data2/share/data/coco/annotations
+  
+# data augmentation
+
+tmp_path: tmp/small-dataset-debug/
 
 inst_desc_match:
   word2vec: /data2/private/cc/wheels/GoogleNews-vectors-negative300.bin
@@ -16,8 +28,6 @@ inst_desc_match:
   caption_annotation: /data2/share/data/coco/annotations/small_dataset/captions_train.json
   instance_annotation: /data2/share/data/coco/annotations/small_dataset/instances_train.json
   output_dir: ${tmp_path}/idm_results
-  categories: 
-    - dog
   th_wordsim: 0.5
 
 crop_inpaint:
@@ -28,6 +38,7 @@ crop_inpaint:
     model_path: /data2/private/cc/experiment/lama/big-lama
     indir: ${crop_inpaint.template_path}
     outdir: ${tmp_path}/inpaint_images
+    device: cuda:1
 
 augment:
   idm_dir: ${inst_desc_match.output_dir}

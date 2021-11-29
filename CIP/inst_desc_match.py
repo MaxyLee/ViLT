@@ -58,8 +58,9 @@ class IDMAnn:
                 'imgid': imgid,
                 'inst_id': ann['id'],
                 'bbox': ann['bbox'],
-                'object_template_captions': template_captions(captions_tokens, ann['inst_desc_map']), # ['A man standing', 'next', 'to', '[TPL]', 'on', 'the', 'ground', '.']
-                'subject_template_captions': None # ['[TPL] on the ground .']
+                'img_size': ann['img_size'],
+                'object_template_captions': template_captions(captions_tokens, ann['inst_desc_map']), # ['A man standing next to [OBJ] on the ground .']
+                'subject_template_captions': None # ['[SUB] on the ground .']
             }
             all_templates.append(template)
         return all_templates
@@ -122,10 +123,23 @@ class IDMAnn:
             all_instance_images.append(instance_image)
         return image_vcat(all_instance_images)
 
+class DatasetIDMAnn:
+
+    def __init__(self, image_path, templates, instances):
+        self.image_path = image_path
+        self.templates = templates
+        self.instances = instances
+        self.keys = list(template.keys())
+
+    
+    
+
 ############# Match Functions #############
 
 def cosine_similarity(x, y):
-    return (x*y).sum()/(np.linalg.norm(x)*np.linalg.norm(y))
+    vector_sim = lambda x,y: (x*y).sum()/(np.linalg.norm(x)*np.linalg.norm(y))
+    all_sims = [vector_sim(xx, y) for xx in x]
+    return np.max(all_sims)
 
 def instance_similarity_score(src_instance, tgt_instance):
     """ shape similarity (src_size => tgt_size)
@@ -147,7 +161,7 @@ def noun_word2phrase(pos_tags, noun_ids):
             if pos_tags[idx][1][:2] == 'CC':
                 if idx == 0:
                     break
-                if pos_tags[idx-1][1][:2] != 'JJ':
+                if pos_tags[idx-1][1][:2] != 'JJ' and pos_tags[idx-1][1][0] != 'brown': # a brown and black dog
                     break
             elif pos_tags[idx][1][:2] == 'RB':
                 if pos_tags[idx+1][1][:2] != 'JJ':
@@ -173,9 +187,25 @@ def run_inst_desc_match(config, output_dir=None):
     caption_anns = COCO(config['caption_annotation'])
     instance_anns = COCO(config['instance_annotation'])
 
-    nms = config['categories']
-    catIds = instance_anns.getCatIds(catNms=nms)
-    imgIds = instance_anns.getImgIds(catIds=catIds)
+    categories = config.get('categories', [])
+    supercategories = config.get('supercategories', [])
+    if len(categories) or len(supercategories):
+        print(f'Specified Supercategories: {supercategories}')
+        print(f'Specified Categories: {categories}')
+        catIds = []
+        if categories:
+            catIds += instance_anns.getCatIds(catNms=categories)
+        if supercategories:
+            catIds += instance_anns.getCatIds(supNms=supercategories)
+        imgIds = set()
+        for catId in catIds:
+            imgIds.update(instance_anns.getImgIds(catIds=[catId]))
+        imgIds = list(imgIds)
+    else:
+        catIds = instance_anns.getCatIds()
+        imgIds = instance_anns.getImgIds()
+
+    print(f"augment images / total images: {len(imgIds)}/{len(instance_anns.getImgIds())}")
 
     idmAnns = []
     for imgid in tqdm(imgIds, desc='Parse Templates'):
@@ -222,7 +252,7 @@ def run_inst_desc_match(config, output_dir=None):
                 ann_catname = instance_anns.cats[ann_catid]['name']
                 ann_caption_mapping = []
 
-                ann_vec = word2vec[ann_catname]
+                ann_vec = [word2vec[word] for word in ann_catname.split()]
                 for idx, noun_vec in caption_noun_vecs:
                     sim = cosine_similarity(ann_vec, noun_vec)
                     if sim > th:
@@ -241,13 +271,17 @@ def run_inst_desc_match(config, output_dir=None):
                 ann['inst_desc_map'] = instance_descrip_mapping[ann_id]
                 mapped_anns.append(ann)
 
-        # image = loadImage(inpaint_image_path, imgid, fmt='{imgid}_mask.png')
+        if len(mapped_anns) == 0:
+            continue
 
         for ann in mapped_anns:
             ann['category'] = instance_anns.cats[ann['category_id']]
             ann['mask'] = instance_anns.annToMask(ann)
+            ann['img_size'] = (instance_anns.imgs[imgid]['height'], instance_anns.imgs[imgid]['width'])
 
         idmAnn = IDMAnn.from_mapped_anns(image_path, imgid, caption_tokens, mapped_anns)
+        if len(idmAnn.templates) == 0 or idmAnn.instances == 0:
+            import ipdb; ipdb.set_trace()
         idmAnns.append(idmAnn)
 
     if output_dir is not None:
@@ -322,13 +356,18 @@ def save_idmanns(idmAnns, config, output_dir='idm_results'):
         for idx, instance in enumerate(idmAnn.instances):
             instances[f"{imgid}-{instance['id']}"] = instance
 
+    print(f'Number of templates / total images: {len(templates)}/{len(idmAnns)}')
+
     json.dump({'image_path': config['image_path'], 'templates': templates}, open(f'{output_dir}/templates.json', 'w'))
     pickle.dump(instances, open(f'{output_dir}/instances.pickle', 'wb'))
 
-def load_idmanns(output_dir, return_anns=False):
+def load_idmanns(output_dir, return_anns=False, load_instances=True):
     config = OmegaConf.load(f'{output_dir}/config.yaml')
     templates = json.load(open(f'{output_dir}/templates.json'))['templates']
-    instances = pickle.load(open(f'{output_dir}/instances.pickle', 'rb'))
+    if load_instances:
+        instances = pickle.load(open(f'{output_dir}/instances.pickle', 'rb'))
+    else:
+        instances = None
 
     if return_anns:
         image_path = config['image_path']
@@ -348,7 +387,9 @@ def load_idmanns(output_dir, return_anns=False):
                 tmp_instances = []
             else:
                 tmp_templates.append(templates[key])
-                tmp_instances.append(instances[key])
+                if load_instances:
+                    tmp_instances.append(instances[key])
+        image_anns.append(IDMAnn(image_path, tmp_imgid, tmp_templates, tmp_instances))
         return image_anns
     else:
         return templates, instances, config
@@ -362,15 +403,19 @@ if __name__ == '__main__':
     # os.makedirs(output_dir, exist_ok=True)
     # save_idmanns(idmAnns, config, output_dir=output_dir)
 
-    idmAnns = load_idmanns('tmp/idm_results')
+    idmAnns = load_idmanns('tmp/small-dataset-all/idm_results', return_anns=True)
 
-    # os.makedirs('test/templates', exist_ok=True)
-    # os.makedirs('test/instances', exist_ok=True)
+    import ipdb; ipdb.set_trace()
 
-    # for idmAnn in idmAnns:
-    #     template = idmAnn.draw_templates_image()
-    #     instance = idmAnn.draw_instances_image()
-    #     template.save(f'test/templates/{idmAnn.imgid}.png')
-    #     instance.save(f'test/instances/{idmAnn.imgid}.png')
+    output_dir = 'test-all-0.5'
+    os.makedirs(f'{output_dir}', exist_ok=True)
+
+    idxs = random.sample(range(len(idmAnns)), 1000)
+    for idx in tqdm(idxs):
+        idmAnn = idmAnns[idx]
+        template = idmAnn.draw_templates_image()
+        instance = idmAnn.draw_instances_image()
+        image = image_vcat([template, instance])
+        image.save(f'{output_dir}/{idmAnn.imgid}.png')
 
     import ipdb; ipdb.set_trace()
