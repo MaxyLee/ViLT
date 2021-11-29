@@ -173,9 +173,25 @@ def run_inst_desc_match(config, output_dir=None):
     caption_anns = COCO(config['caption_annotation'])
     instance_anns = COCO(config['instance_annotation'])
 
-    nms = config['categories']
-    catIds = instance_anns.getCatIds(catNms=nms)
-    imgIds = instance_anns.getImgIds(catIds=catIds)
+    categories = config.get('categories', [])
+    supercategories = config.get('supercategories', [])
+    if len(categories) or len(supercategories):
+        print(f'Specified Supercategories: {supercategories}')
+        print(f'Specified Categories: {categories}')
+        catIds = []
+        if categories:
+            catIds += instance_anns.getCatIds(catNms=categories)
+        if supercategories:
+            catIds += instance_anns.getCatIds(supNms=supercategories)
+        imgIds = set()
+        for catId in catIds:
+            imgIds.update(instance_anns.getImgIds(catIds=[catId]))
+        imgIds = list(imgIds)
+    else:
+        catIds = instance_anns.getCatIds()
+        imgIds = instance_anns.getImgIds()
+
+    print(f"augment images / total images: {len(imgIds)}/{len(instance_anns.getImgIds())}")
 
     idmAnns = []
     for imgid in tqdm(imgIds, desc='Parse Templates'):
@@ -321,6 +337,8 @@ def save_idmanns(idmAnns, config, output_dir='idm_results'):
             templates[f"{imgid}-{template['inst_id']}"] = template
         for idx, instance in enumerate(idmAnn.instances):
             instances[f"{imgid}-{instance['id']}"] = instance
+
+    print(f'Number of templates/instances: {len(templates)}')
 
     json.dump({'image_path': config['image_path'], 'templates': templates}, open(f'{output_dir}/templates.json', 'w'))
     pickle.dump(instances, open(f'{output_dir}/instances.pickle', 'wb'))
