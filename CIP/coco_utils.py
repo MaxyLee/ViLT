@@ -41,8 +41,8 @@ def image_id2path(image_path, imgid):
 
 def loadImage(image_path, imgid, fmt='{imgid:0>12d}.jpg'):
     formatted_fn = fmt.format(imgid=imgid)
-    im = io.imread(f'{image_path}/{formatted_fn}')
-    im = Image.fromarray(im)
+    img_fn = f'{image_path}/{formatted_fn}'
+    im = Image.open(img_fn).convert('RGB')
     return im
 
 def loadCaptions(caption_anns, imgid):

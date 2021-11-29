@@ -20,7 +20,7 @@ analysis:
   
 # data augmentation
 
-tmp_path: tmp/small-dataset-all/
+tmp_path: tmp/small-dataset-debug/
 
 inst_desc_match:
   word2vec: /data2/private/cc/wheels/GoogleNews-vectors-negative300.bin
@@ -38,6 +38,7 @@ crop_inpaint:
     model_path: /data2/private/cc/experiment/lama/big-lama
     indir: ${crop_inpaint.template_path}
     outdir: ${tmp_path}/inpaint_images
+    device: cuda:1
 
 augment:
   idm_dir: ${inst_desc_match.output_dir}

@@ -1,5 +1,6 @@
 import os
 import json
+import shutil
 import argparse
 import subprocess
 import numpy as np
@@ -41,10 +42,10 @@ def run_crop_inpaint(config):
     output_dir = config['template_path']
     os.makedirs(output_dir, exist_ok=True)
     for label, template in tqdm(templates.items(), desc='Save images and masks'):
-        image = loadImage(image_path, template['imgid'])
-        image.save(f'{output_dir}/{label}.png')
+        shutil.copyfile(f"{image_path}/{template['imgid']:0>12d}.jpg", f'{output_dir}/{label}.png')
+        img_size = template['img_size']
 
-        mask = np.zeros((image.size[1], image.size[0]), dtype=np.uint8)
+        mask = np.zeros(img_size, dtype=np.uint8)
         x1, y1, x2, y2 = bbox2xy(template['bbox'])
         mask[y1:y2, x1:x2] = 255
         mask_image = Image.fromarray(mask)
@@ -57,7 +58,8 @@ def run_crop_inpaint(config):
     src_file = f"{inpaint_config['code_path']}/bin/predict.py"
     indir = os.path.abspath(inpaint_config['indir'])
     outdir = os.path.abspath(inpaint_config['outdir'])
-    command =  f"{environ} python3 {src_file} model.path={inpaint_config['model_path']} indir={indir} outdir={outdir}"
+    device = inpaint_config['device']
+    command =  f"{environ} python3 {src_file} model.path={inpaint_config['model_path']} indir={indir} outdir={outdir} device={device}"
     subprocess.run(command, shell=True)
 
 if __name__ == '__main__':
