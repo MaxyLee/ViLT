@@ -28,17 +28,17 @@ class CocoCaptionKarpathyDataset(BaseDataset):
         return suite
 
 class CocoSubDataset(BaseDataset):
-    def __init__(self, *args, split="", cat='dog', **kwargs):
+    def __init__(self, *args, split="", **kwargs):
         assert split in ["train", "val", "test"]
         self.split = split
 
         if split == "train":
-            names = [f"coco_train_{cat}", f"coco_restval_{cat}"]
+            names = [f"coco_rand_train", f"coco_rand_restval"]
         elif split == "val":
-            names = [f"coco_val_{cat}"]
+            names = [f"coco_rand_val"]
             # names = ["coco_caption_karpathy_test"]
         elif split == "test":
-            names = [f"coco_test_{cat}"]
+            names = [f"coco_rand_test"]
 
         super().__init__(*args, **kwargs, names=names, text_column_name="caption")
 
