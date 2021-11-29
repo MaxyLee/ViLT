@@ -123,16 +123,6 @@ class IDMAnn:
             all_instance_images.append(instance_image)
         return image_vcat(all_instance_images)
 
-class DatasetIDMAnn:
-
-    def __init__(self, image_path, templates, instances):
-        self.image_path = image_path
-        self.templates = templates
-        self.instances = instances
-        self.keys = list(template.keys())
-
-    
-    
 
 ############# Match Functions #############
 
