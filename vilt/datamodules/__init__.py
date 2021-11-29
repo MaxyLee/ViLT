@@ -1,6 +1,6 @@
 from .vg_caption_datamodule import VisualGenomeCaptionDataModule
 from .f30k_caption_karpathy_datamodule import F30KCaptionKarpathyDataModule
-from .coco_caption_karpathy_datamodule import CocoCaptionKarpathyDataModule, CocoSubDataModule
+from .coco_caption_karpathy_datamodule import CocoCaptionKarpathyDataModule, CocoSubDataModule, CocoSubCIPDataModule
 from .conceptual_caption_datamodule import ConceptualCaptionDataModule
 from .sbu_datamodule import SBUCaptionDataModule
 from .vqav2_datamodule import VQAv2DataModule
@@ -13,6 +13,7 @@ _datamodules = {
     "f30k": F30KCaptionKarpathyDataModule,
     "coco": CocoCaptionKarpathyDataModule,
     "coco_sub": CocoSubDataModule,
+    "coco_sub_cip": CocoSubCIPDataModule,
     "gcc": ConceptualCaptionDataModule,
     "sbu": SBUCaptionDataModule,
     "vqa": VQAv2DataModule,

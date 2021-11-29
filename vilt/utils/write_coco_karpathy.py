@@ -10,6 +10,30 @@ from glob import glob
 from pycocotools.coco import COCO
 from collections import defaultdict
 
+def make_cip(root, cip_root):
+    bs = []
+
+    with open(f'{cip_root}/captions.txt') as f:
+        for line in tqdm(f):
+            filepath, captions = line.split(':\t')
+            filename = filepath.split('/')[-1]
+            with open(f'{cip_root}/{filename}', "rb") as fp:
+                binary = fp.read()
+            captions = eval(captions)
+            bs.append([binary, captions, filename, 'train'])
+
+    dataframe = pd.DataFrame(
+        bs, columns=["image", "caption", "image_id", "split"],
+    )
+
+    table = pa.Table.from_pandas(dataframe)
+    os.makedirs(root, exist_ok=True)
+    with pa.OSFile(
+        f"{root}/coco_rand_train_cip.arrow", "wb"
+    ) as sink:
+        with pa.RecordBatchFileWriter(sink, table.schema) as writer:
+            writer.write_table(table)
+
 def make_subset(root, query_name='dog'):
     random.seed(0)
     # load annotations
@@ -126,5 +150,8 @@ def make_arrow(root, dataset_root):
                 writer.write_table(table)
 
 if __name__ == '__main__':
-    root = '/data/share/UNITER/origin_imgs/coco_original'
-    make_subset(root)
+    # root = '/data/share/UNITER/origin_imgs/coco_original'
+    # make_subset(root)
+    root = '/data2/share/data/ViLT/data/COCO'
+    cip_root = '/data/private/mxy/projects/mmda/code/ViLT/CIP/tmp/small-dataset/augment_results'
+    make_cip(root, cip_root)
