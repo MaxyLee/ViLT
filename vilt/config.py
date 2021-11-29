@@ -294,7 +294,7 @@ def task_finetune_irtr_coco_sub_randaug():
     train_transform_keys = ["pixelbert_randaug"]
     loss_names = _loss_names({"itm": 0.5, "irtr": 1})
     batch_size = 256
-    max_epoch = 10
+    max_epoch = 30
     max_steps = None
     warmup_steps = 0.1
     get_recall_metric = True
