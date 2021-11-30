@@ -38,7 +38,11 @@ crop_inpaint:
     model_path: /data2/private/cc/experiment/lama/big-lama
     indir: ${crop_inpaint.template_path}
     outdir: ${tmp_path}/inpaint_images
-    device: cuda:1
+    device: 
+      - cuda:1
+      - cuda:2
+      - cuda:5
+      - cuda:6
 
 augment:
   k: 1

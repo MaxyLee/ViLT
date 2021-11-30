@@ -1,6 +1,8 @@
 import os
+import time
 import json
 import shutil
+import signal
 import argparse
 import subprocess
 import numpy as np
@@ -37,9 +39,9 @@ def run_crop_inpaint(config):
     print('[Run]: crop-inpaint')
     annotations = json.load(open(config['template_annotation']))
     image_path, templates = annotations['image_path'], annotations['templates']
+    output_dir = config['template_path']
 
     print('saving_images')
-    output_dir = config['template_path']
     os.makedirs(output_dir, exist_ok=True)
     for label, template in tqdm(templates.items(), desc='Save images and masks'):
         shutil.copyfile(f"{image_path}/{template['imgid']:0>12d}.jpg", f'{output_dir}/{label}.png')
@@ -59,8 +61,41 @@ def run_crop_inpaint(config):
     indir = os.path.abspath(inpaint_config['indir'])
     outdir = os.path.abspath(inpaint_config['outdir'])
     device = inpaint_config['device']
-    command =  f"{environ} python3 {src_file} model.path={inpaint_config['model_path']} indir={indir} outdir={outdir} device={device}"
-    subprocess.run(command, shell=True)
+
+    data_split = len(device)
+    if data_split == 1:
+        command =  f"{environ} python3 {src_file} model.path={inpaint_config['model_path']} indir={indir} outdir={outdir} device={device}"
+        subprocess.run(command, shell=True)
+    else:
+        # split data
+        process_pool = []
+        label_splits = np.array_split(list(templates.keys()), data_split)
+        for i, labels in enumerate(label_splits):
+            indir_i = f"{indir}/subdir-{i}"
+            device_i = device[i]
+            # os.makedirs(indir_i, exist_ok=True)
+            # for label in tqdm(labels):
+            #     shutil.copyfile(f"{output_dir}/{label}.png", f"{indir_i}/{label}.png")
+            #     shutil.copyfile(f"{output_dir}/{label}_mask.png", f"{indir_i}/{label}_mask.png")
+            command_i =  f"{environ} exec python3 {src_file} model.path={inpaint_config['model_path']} indir={indir_i} outdir={outdir} device={device_i} &"
+            process_pool.append(subprocess.Popen(command_i, shell=True))
+        
+        def terminate(signum, frame):
+            print('KeyboardInterupt: kill all subprocesses...')
+            for p in process_pool:
+                os.killpg(os.getpgid(p.pid), signal.SIGTERM)
+            exit()
+
+        signal.signal(signal.SIGINT, terminate)
+        time.sleep(1000)
+        while True:
+            status = [p.poll() for p in process_pool]
+            if None in status:
+                time.sleep(10)
+            else:
+                print('[Run] crop-inpaint: finished!')
+                break
+
 
 if __name__ == '__main__':
     args = parse_args()
