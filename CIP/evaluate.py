@@ -29,7 +29,7 @@ def run_evaluate(config):
                 scores_i = scores[i][batch_split[i]:batch_split[i+1]].tolist()
                 mean_score_i = np.mean(scores_i)
                 all_scores += scores_i
-                fout.write(f'{image_fn}:\t{mean_score_i}\t{scores}\n')
+                fout.write(f'{batch_images[i]}:\t{mean_score_i}\t{scores_i}\n')
 
             batch_images = []
             batch_captions = []
@@ -42,6 +42,6 @@ def run_evaluate(config):
             scores_i = scores[i][batch_split[i]:batch_split[i+1]].tolist()
             mean_score_i = np.mean(scores_i)
             all_scores += scores_i
-            fout.write(f'{image_fn}:\t{mean_score_i}\t{scores}\n')
+            fout.write(f'{batch_images[i]}:\t{mean_score_i}\t{scores_i}\n')
 
     print(f'Average CLIP-score: {np.mean(all_scores)}')
