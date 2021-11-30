@@ -1,4 +1,5 @@
 import os, random
+import pickle
 from pycocotools.coco import COCO
 import skimage.io as io
 from PIL import Image
@@ -13,6 +14,8 @@ from coco_utils import (
 )
 
 from inst_desc_match import load_idmanns
+from collections import defaultdict
+from itertools import combinations
 
 def inst_match_score(src_inst, tgt_inst):
     """ shape similarity (src_size => tgt_size)
@@ -57,31 +60,68 @@ def augment_template_with_instance(template, instance, image_filepath):
     captions = augment_captions(template['object_template_captions'], instance['object_descs'])
     return image, captions
 
+def get_inst_scores(idm_dir, instances, cat2ids):
+    filename = f'{idm_dir}/inst_scores.pickle'
+    if os.path.isfile(filename):
+        with open(filename, 'rb') as f:
+            inst_scores = pickle.load(f)
+    else:
+        inst_scores = defaultdict(dict)
+        for cat, ids in cat2ids.items():
+            for i in tqdm(combinations(ids, 2), desc=f'processing score of {cat}'):
+                tgt_inst = instances[i[0]]
+                src_inst = instances[i[1]]
+                match_score = inst_match_score(src_inst, tgt_inst)
+                key = frozenset({tgt_inst['id'], src_inst['id']})
+                inst_scores[cat][key] = match_score
+        with open(filename, 'wb') as f:
+            pickle.dump(inst_scores, f)
+    return inst_scores
+
 def run_augment(config):
     print('[Run]: augmentation')
+    random.seed(config['seed'])
+    k = config['k']
     idm_dir = config['idm_dir']
     inpaint_dir = config['inpaint_dir']
     output_dir = config['output_dir']
     th_matchscore = config['th_matchscore']
     templates, instances, idm_config = load_idmanns(idm_dir)
 
+    cat2ids = defaultdict(list)
+    for iid, ins in instances.items():
+        cat = ins['attr']['category']['name']
+        cat2ids[cat].append(iid)
+
+    # inst_scores = get_inst_scores(idm_dir, instances, cat2ids)
+
     os.makedirs(output_dir, exist_ok=True)
     fout = open(f'{output_dir}/captions.txt', 'w')
 
+    print(f'Max num per image: {k}')
+
     int = 0
     for template_key in tqdm(templates, desc='Augment Templates'):
+        t_cnt = 0
         template = templates[template_key]
         tgt_inst = instances[template_key]
-        for instance_key in instances:
+        cat = tgt_inst['attr']['category']['name']
+        same_cat_instances = cat2ids[cat]
+        for instance_key in same_cat_instances:
+            if t_cnt >= k:
+                break
             if instance_key == template_key:
                 continue
             src_inst = instances[instance_key]
+            # key = frozenset({tgt_inst['id'], src_inst['id']})
+            # match_score = inst_scores[cat][key]
             match_score = inst_match_score(src_inst, tgt_inst)
             if match_score > th_matchscore:
                 aug_image, aug_captions = augment_template_with_instance(template, src_inst, f"{inpaint_dir}/{template['imgid']}-{template['inst_id']}_mask.png")
                 aug_image.save(f'{output_dir}/{template_key}-{instance_key}.jpg')
                 fout.write(f'{output_dir}/{template_key}-{instance_key}.jpg:\t{aug_captions}\n')
                 int += 1
+                t_cnt += 1
 
     print(f'total augmented pairs: {int}')
 

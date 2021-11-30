@@ -19,6 +19,6 @@ if __name__ == '__main__':
     # run_analysis(config['analysis'])
 
     # run_inst_desc_match(config['inst_desc_match']) # TODO: all category
-    run_crop_inpaint(config['crop_inpaint'])
+    # run_crop_inpaint(config['crop_inpaint'])
     # run_augment(config['augment']) # TODO: all category, 类内比较，每张图扩展上限
-    # run_evaluate(config['evaluate'])
+    run_evaluate(config['evaluate'])

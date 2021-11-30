@@ -41,13 +41,16 @@ crop_inpaint:
     device: cuda:1
 
 augment:
+  k: 1
+  seed: 18
   idm_dir: ${inst_desc_match.output_dir}
   inpaint_dir: ${crop_inpaint.inpaint.outdir}
+  # inpaint_dir: ${crop_inpaint.template_path}
   output_dir: ${tmp_path}/augment_results
   th_matchscore: 0.7
 
 evaluate:
   data_dir: ${augment.output_dir}
   output_path: ${augment.output_dir}/scores.txt
-  device: 'cuda:0'
+  device: 'cuda:1'
   batch_size: 100
