@@ -153,5 +153,6 @@ if __name__ == '__main__':
     # root = '/data/share/UNITER/origin_imgs/coco_original'
     # make_subset(root)
     root = '/data2/share/data/ViLT/data/COCO'
-    cip_root = '/data/private/mxy/projects/mmda/code/ViLT/CIP/tmp/small-dataset/augment_results'
+    # cip_root = '/data/private/mxy/projects/mmda/code/ViLT/CIP/tmp/small-dataset/augment_results'
+    cip_root = '/data2/private/cc/experiment/ViLT/CIP/tmp/small-dataset-rm_small_obj/augment_results'
     make_cip(root, cip_root)

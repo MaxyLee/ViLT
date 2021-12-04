@@ -1,7 +1,22 @@
+import json
+from sys import base_prefix
 import numpy as np
 
 from tqdm import tqdm
 from clip_score import CLIPScore
+
+def origin_clip_scores():
+    caption_file = '/data2/share/data/coco/annotations/small_dataset/captions_train.json'
+    with open(caption_file) as f:
+        captions = json.load(f)
+    captions = captions['images']
+
+    clip_score = CLIPScore(device='cuda:1')
+
+    base_path = '/data2/share/data/coco/images/train2017'
+    scores = {}
+    for img in tqdm(captions):
+        img_path = f"{base_path}/{img['file_name']}"
 
 def run_evaluate(config):
     print('[Run]: evaluate image-text pairs')
@@ -45,3 +60,6 @@ def run_evaluate(config):
             fout.write(f'{batch_images[i]}:\t{mean_score_i}\t{scores_i}\n')
 
     print(f'Average CLIP-score: {np.mean(all_scores)}')
+
+if __name__ == '__main__':
+    origin_clip_scores()

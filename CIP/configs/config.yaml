@@ -20,7 +20,7 @@ analysis:
   
 # data augmentation
 
-tmp_path: tmp/small-dataset-debug/
+tmp_path: tmp/small-dataset-rm_small_obj/
 
 inst_desc_match:
   word2vec: /data2/private/cc/wheels/GoogleNews-vectors-negative300.bin
@@ -29,6 +29,13 @@ inst_desc_match:
   instance_annotation: /data2/share/data/coco/annotations/small_dataset/instances_train.json
   output_dir: ${tmp_path}/idm_results
   th_wordsim: 0.5
+
+phrase_grounding:
+  image_path: /data2/share/data/coco/images/train2017
+  caption_annotation: /data2/share/data/coco/annotations/small_dataset/captions_train.json
+  instance_annotation: /data2/share/data/coco/annotations/small_dataset/instances_train.json
+  output_dir: ${tmp_path}/pg_results
+  th_bbox_overlap: 0.8
 
 crop_inpaint:
   template_annotation: ${inst_desc_match.output_dir}/templates.json
@@ -56,5 +63,5 @@ augment:
 evaluate:
   data_dir: ${augment.output_dir}
   output_path: ${augment.output_dir}/scores.txt
-  device: 'cuda:1'
+  device: 'cuda:4'
   batch_size: 100

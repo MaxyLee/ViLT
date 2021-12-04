@@ -83,7 +83,7 @@ def config():
     precision = 16
 
     # wandb configs
-    wandb_save_dir = "/data/share/logs/wandb"
+    wandb_save_dir = "/data2/share/logs/wandb"
     wandb_project = "vilt"
     wandb_entity = "carboncoo"
     wandb_id = None
@@ -308,7 +308,7 @@ def task_finetune_irtr_coco_sub_cip():
     train_transform_keys = ["pixelbert_randaug"]
     loss_names = _loss_names({"itm": 0.5, "irtr": 1})
     batch_size = 256
-    max_epoch = 30
+    max_epoch = 10
     max_steps = None
     warmup_steps = 0.1
     get_recall_metric = True

@@ -59,7 +59,7 @@ class CocoSubCIPDataset(BaseDataset):
         self.split = split
 
         if split == "train":
-            names = [f"coco_rand_train", f"coco_rand_restval", f"coco_rand_train_cip", f"coco_rand_restval_cip"]
+            names = [f"coco_rand_train", f"coco_rand_restval", f"coco_rand_train_cip"]
         elif split == "val":
             names = [f"coco_rand_val"]
             # names = ["coco_caption_karpathy_test"]
