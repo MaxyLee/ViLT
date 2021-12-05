@@ -134,6 +134,18 @@ class BaseDataModule(LightningDataModule):
             image_only=self.image_only,
         )
 
+    def make_no_false_test_dset(self, image_only=False):
+        return self.dataset_cls_no_false(
+            self.data_dir,
+            self.val_transform_keys,
+            split="test",
+            image_size=self.image_size,
+            max_text_len=self.max_text_len,
+            draw_false_image=0,
+            draw_false_text=0,
+            image_only=image_only,
+        )
+
     def setup(self, stage):
         if not self.setup_flag:
             self.set_train_dataset()
