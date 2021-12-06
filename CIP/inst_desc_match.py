@@ -1,3 +1,4 @@
+import re
 import enum
 import json
 import pickle
@@ -8,6 +9,7 @@ import skimage.io as io
 from PIL import Image
 import numpy as np
 import nltk
+import stanza
 from gensim import models
 
 from tqdm import tqdm
@@ -17,6 +19,7 @@ from coco_utils import (
     bbox2xy, loadImage, loadCaptions,
     image_vcat, image_hcat, draw_instance_bbox, draw_captions
 )
+from f30k_utils import get_sentence_data, get_annotations
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -163,8 +166,94 @@ def noun_word2phrase(pos_tags, noun_ids):
 
     return res
 
+def find_sub_list(sl,l):
+    sll=len(sl)
+    for ind in (i for i,e in enumerate(l) if e==sl[0]):
+        if l[ind:ind+sll]==sl:
+            return (ind,ind+sll-1)
+
+def match_np(tree_str):
+    # thank you, automata
+    state = 's0'
+    stack = []
+    match = []
+    tmp = ''
+    for i, c in enumerate(tree_str):
+        if state == 's0':
+            if c == '(':
+                if tree_str[i+1:i+3] == 'NP':
+                    state = 's1'
+                    tmp = '('
+                    stack = ['(']
+        elif state == 's1':
+            tmp += c
+            if c == '(':
+                if tree_str[i+1:i+3] == 'NP':
+                    stack = ['(']
+                    tmp = '('
+                else:
+                    stack.append('(')
+            elif c == ')':
+                stack.pop()
+                if stack == []:
+                    state = 's0'
+                    match.append(tmp)
+    return match
+
+
+def noun2np(tree):
+    # return tokens because nltk tokenizer gets different tokens
+    # hack for NNP matching issue
+    tree_str = str(tree).replace('NNP', 'NN')
+    tokens = [r[1] for r in re.findall(r'( \(.+? ([^\(]*?)\))', tree_str)]
+    res = {}
+    try:
+        # nps = re.findall(r'(\(NP (\(((?!NP).)*? (\(*.*?\))*?\))+?\)?)', tree_str)
+        nps = match_np(tree_str)
+        for np in nps:
+            # m = re.match(r'\(NP .*?\(NN\w? (.*?)\)\)', np[0])
+            nouns = [r[1] for r in re.findall(r'( \(NN\w* (.*?)\))', np)]
+            toks = [r[1] for r in re.findall(r'( \(.+? ([^\(]*?)\))', np)]
+
+            indices = find_sub_list(toks, tokens)
+            n_indices = [toks.index(n)+indices[0] for n in nouns]
+            
+            for idx in n_indices:
+                res[idx] = indices
+    except:
+        import ipdb; ipdb.set_trace()
+    return res, tokens
+
 def location_parse(pos_tags):
     pass
+
+def inst_desc_match_f30k():
+    root = '/data2/share/data/flickr30k-entities'
+    img_path = f'{root}/flickr30k-images'
+    ann_path = f'{root}/Annotations'
+    cap_path = f'{root}/Sentences'
+
+    with open(f'{root}/karpathy/dataset_flickr30k.json', 'r') as f:
+        dataset = json.load(f)
+    images = dataset['images']
+
+    imgids = [img['filename'][:-4] for img in images if img['split'] == 'train']
+
+    idmAnns = []
+    for imgid in tqdm(imgids):
+        img = Image.open(f'{img_path}/{imgid}.jpg')
+        anns = get_annotations(f'{ann_path}/{imgid}.xml')
+        caps = get_sentence_data(f'{cap_path}/{imgid}.txt')
+
+
+        # for phrase_id, boxes in anns['boxes'].items():
+        #     for bbox in boxes:
+        #         img = draw_instance_bbox(img, bbox, label=phrase_id)
+
+        # img.save('tmp/f30k_test.jpg')
+        import ipdb; ipdb.set_trace()
+
+    return idmAnns
 
 def run_inst_desc_match(config, output_dir=None):
     print('[Run]: instance-description matching')
@@ -174,6 +263,7 @@ def run_inst_desc_match(config, output_dir=None):
     print(f"Done (t={time.time()-t:.2f}s)")
 
     image_path = config['image_path']
+    th_coverage = config.get('th_coverage', [0.1, 0.7])
     caption_anns = COCO(config['caption_annotation'])
     instance_anns = COCO(config['instance_annotation'])
 
@@ -197,6 +287,9 @@ def run_inst_desc_match(config, output_dir=None):
 
     print(f"augment images / total images: {len(imgIds)}/{len(instance_anns.getImgIds())}")
 
+    with open(config['tree_path']) as f:
+        id2tree = json.load(f)
+
     idmAnns = []
     for imgid in tqdm(imgIds, desc='Parse Templates'):
         # object-description alignment for a single image
@@ -205,13 +298,21 @@ def run_inst_desc_match(config, output_dir=None):
         instance_annIds = instance_anns.getAnnIds(imgIds=[imgid])
         anns = instance_anns.loadAnns(instance_annIds)
 
+        img_size = (instance_anns.imgs[imgid]['height'], instance_anns.imgs[imgid]['width'])
+        img_area = img_size[0] * img_size[1]
+
+        # filter out unsuitable instances
         filtered_anns = []
         for ann in anns:
             ann_catid = ann['category_id']
             if ann_catid not in catIds:
                 continue
+            inst_area = ann['bbox'][-2] * ann['bbox'][-1]
+            coverage = float(inst_area) / img_area
+            if coverage < th_coverage[0] or coverage > th_coverage[1]:
+                continue
             filtered_anns.append(ann)
-        anns = filtered_anns   
+        anns = filtered_anns
 
         instance_descrip_mapping = {}
         caption_tokens = []
@@ -233,7 +334,10 @@ def run_inst_desc_match(config, output_dir=None):
                     caption_noun_vecs.append((i, word2vec[word]))
 
             # noun word to noun phrase
-            word2phrase_mapping = noun_word2phrase(tags, [i for i, _ in caption_noun_vecs])
+            # word2phrase_mapping = noun_word2phrase(tags, [i for i, _ in caption_noun_vecs])
+
+            tree = id2tree[str(imgid)][caption]
+            word2phrase_mapping_tree, tokens = noun2np(tree)
 
             # match ann_catname with caption_nouns
             for ann in anns:
@@ -245,8 +349,14 @@ def run_inst_desc_match(config, output_dir=None):
                 ann_vec = [word2vec[word] for word in ann_catname.split()]
                 for idx, noun_vec in caption_noun_vecs:
                     sim = cosine_similarity(ann_vec, noun_vec)
+                    
                     if sim > th:
-                        l, r = word2phrase_mapping[idx]
+                        if idx not in word2phrase_mapping_tree:
+                            # print('whoops! word not in mapping...')
+                            # print(tree)
+                            # print(tags)
+                            continue
+                        l, r = word2phrase_mapping_tree[idx]
                         ann_caption_mapping.append(((l, r+1), 
                                                     ' '.join(tokens[l:r+1])))
 
@@ -281,6 +391,16 @@ def run_inst_desc_match(config, output_dir=None):
         output_dir = config['output_dir']
         os.makedirs(output_dir, exist_ok=True)
         save_idmanns(idmAnns, config, output_dir=output_dir)
+
+    if config.get('visualize', False):
+        os.makedirs(f'{output_dir}/result_imgs', exist_ok=True)
+        idxs = random.sample(range(len(idmAnns)), 1000)
+        for idx in tqdm(idxs, desc='Draw Templates'):
+            idmAnn = idmAnns[idx]
+            template = idmAnn.draw_templates_image()
+            instance = idmAnn.draw_instances_image()
+            image = image_vcat([template, instance])
+            image.save(f'{output_dir}/result_imgs/{idmAnn.imgid}.png')
     return idmAnns
 
 ############# Visualization Functions #############
@@ -366,8 +486,8 @@ def load_idmanns(output_dir, return_anns=False, load_instances=True):
 
         tmp_key = keys[0]
         tmp_imgid = int(tmp_key.split('-')[0])
-        tmp_templates = []
-        tmp_instances = []
+        tmp_templates = [templates[tmp_key]]
+        tmp_instances = [instances[tmp_key]]
         for key in keys[1:]:
             imgid = int(key.split('-')[0])
             if imgid != tmp_imgid:
@@ -375,10 +495,9 @@ def load_idmanns(output_dir, return_anns=False, load_instances=True):
                 tmp_imgid = imgid
                 tmp_templates = []
                 tmp_instances = []
-            else:
-                tmp_templates.append(templates[key])
-                if load_instances:
-                    tmp_instances.append(instances[key])
+            tmp_templates.append(templates[key])
+            if load_instances:
+                tmp_instances.append(instances[key])
         image_anns.append(IDMAnn(image_path, tmp_imgid, tmp_templates, tmp_instances))
         return image_anns
     else:
@@ -392,20 +511,4 @@ if __name__ == '__main__':
     # output_dir = config['output_dir']
     # os.makedirs(output_dir, exist_ok=True)
     # save_idmanns(idmAnns, config, output_dir=output_dir)
-
-    idmAnns = load_idmanns('tmp/small-dataset-all/idm_results', return_anns=True)
-
-    import ipdb; ipdb.set_trace()
-
-    output_dir = 'test-all-0.5'
-    os.makedirs(f'{output_dir}', exist_ok=True)
-
-    idxs = random.sample(range(len(idmAnns)), 1000)
-    for idx in tqdm(idxs):
-        idmAnn = idmAnns[idx]
-        template = idmAnn.draw_templates_image()
-        instance = idmAnn.draw_instances_image()
-        image = image_vcat([template, instance])
-        image.save(f'{output_dir}/{idmAnn.imgid}.png')
-
-    import ipdb; ipdb.set_trace()
+    inst_desc_match_f30k()

@@ -481,14 +481,15 @@ def compute_irtr(pl_module, batch):
 
 @torch.no_grad()
 def compute_irtr_recall(pl_module):
-    if pl_module.validating:
-        text_dset = pl_module.trainer.datamodule.dms[0].make_no_false_val_dset()
-        image_dset = pl_module.trainer.datamodule.dms[0].make_no_false_val_dset(
-            image_only=True
-        )
-    elif pl_module.testing:
+    if pl_module.trainer.testing:
+        print('using test set for irtr eval')
         text_dset = pl_module.trainer.datamodule.dms[0].make_no_false_test_dset()
         image_dset = pl_module.trainer.datamodule.dms[0].make_no_false_test_dset(
+            image_only=True
+        )
+    else:
+        text_dset = pl_module.trainer.datamodule.dms[0].make_no_false_val_dset()
+        image_dset = pl_module.trainer.datamodule.dms[0].make_no_false_val_dset(
             image_only=True
         )
     text_dset.tokenizer = pl_module.trainer.datamodule.dms[0].tokenizer

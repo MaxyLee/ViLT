@@ -10,6 +10,28 @@ from glob import glob
 from collections import defaultdict
 
 
+def make_cip(root, cip_root, name=None):
+    bs = []
+
+    with open(f'{cip_root}/captions.txt') as f:
+        for line in tqdm(f):
+            filepath, captions = line.split(':\t')
+            filename = filepath.split('/')[-1]
+            with open(f'{cip_root}/{filename}', "rb") as fp:
+                binary = fp.read()
+            captions = eval(captions)
+            bs.append([binary, captions, filename, 'train'])
+
+    dataframe = pd.DataFrame(
+        bs, columns=["image", "caption", "image_id", "split"],
+    )
+
+    table = pa.Table.from_pandas(dataframe)
+    os.makedirs(root, exist_ok=True)
+    fn = f'f30k_train_cip_{name}.arrow' if name else 'f30k_train_cip.arrow'
+    with pa.OSFile(f"{root}/{fn}", "wb") as sink:
+        with pa.RecordBatchFileWriter(sink, table.schema) as writer:
+            writer.write_table(table)
 
 def back_translation(root):
     back_translation_aug = naw.BackTranslationAug(from_model_name='facebook/wmt19-en-de', to_model_name='facebook/wmt19-de-en', device='cuda:2')
@@ -75,3 +97,10 @@ def make_arrow(root, dataset_root):
         ) as sink:
             with pa.RecordBatchFileWriter(sink, table.schema) as writer:
                 writer.write_table(table)
+
+
+if __name__ == '__main__':
+    root = '/data2/share/data/ViLT/data/flickr30k'
+    cip_root = '/data/private/mxy/projects/mmda/code/ViLT/CIP/tmp/small-dataset-tree/augment_results'
+    # cip_root = '/data2/private/cc/experiment/ViLT/CIP/tmp/small-dataset-rm_small_obj/augment_results'
+    make_cip(root, cip_root, name='tree')

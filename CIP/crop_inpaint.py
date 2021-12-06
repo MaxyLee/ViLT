@@ -73,10 +73,10 @@ def run_crop_inpaint(config):
         for i, labels in enumerate(label_splits):
             indir_i = f"{indir}/subdir-{i}"
             device_i = device[i]
-            # os.makedirs(indir_i, exist_ok=True)
-            # for label in tqdm(labels):
-            #     shutil.copyfile(f"{output_dir}/{label}.png", f"{indir_i}/{label}.png")
-            #     shutil.copyfile(f"{output_dir}/{label}_mask.png", f"{indir_i}/{label}_mask.png")
+            os.makedirs(indir_i, exist_ok=True)
+            for label in tqdm(labels):
+                shutil.copyfile(f"{output_dir}/{label}.png", f"{indir_i}/{label}.png")
+                shutil.copyfile(f"{output_dir}/{label}_mask.png", f"{indir_i}/{label}_mask.png")
             command_i =  f"{environ} exec python3 {src_file} model.path={inpaint_config['model_path']} indir={indir_i} outdir={outdir} device={device_i} &"
             process_pool.append(subprocess.Popen(command_i, shell=True))
         

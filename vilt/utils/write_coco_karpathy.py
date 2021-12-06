@@ -10,7 +10,7 @@ from glob import glob
 from pycocotools.coco import COCO
 from collections import defaultdict
 
-def make_cip(root, cip_root):
+def make_cip(root, cip_root, name=None):
     bs = []
 
     with open(f'{cip_root}/captions.txt') as f:
@@ -28,9 +28,8 @@ def make_cip(root, cip_root):
 
     table = pa.Table.from_pandas(dataframe)
     os.makedirs(root, exist_ok=True)
-    with pa.OSFile(
-        f"{root}/coco_rand_train_cip.arrow", "wb"
-    ) as sink:
+    fn = f'coco_rand_train_cip_{name}.arrow' if name else 'coco_rand_train_cip.arrow'
+    with pa.OSFile(f"{root}/{fn}", "wb") as sink:
         with pa.RecordBatchFileWriter(sink, table.schema) as writer:
             writer.write_table(table)
 
@@ -153,6 +152,6 @@ if __name__ == '__main__':
     # root = '/data/share/UNITER/origin_imgs/coco_original'
     # make_subset(root)
     root = '/data2/share/data/ViLT/data/COCO'
-    # cip_root = '/data/private/mxy/projects/mmda/code/ViLT/CIP/tmp/small-dataset/augment_results'
-    cip_root = '/data2/private/cc/experiment/ViLT/CIP/tmp/small-dataset-rm_small_obj/augment_results'
-    make_cip(root, cip_root)
+    cip_root = '/data/private/mxy/projects/mmda/code/ViLT/CIP/tmp/small-dataset-tree-rm_small_obj/augment_results'
+    # cip_root = '/data2/private/cc/experiment/ViLT/CIP/tmp/small-dataset-rm_small_obj/augment_results'
+    make_cip(root, cip_root, name='tree-rm_small_obj')

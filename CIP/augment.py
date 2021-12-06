@@ -17,8 +17,8 @@ from inst_desc_match import load_idmanns
 from collections import defaultdict
 from itertools import combinations
 
-def inst_match_score(src_inst, tgt_inst):
-    """ shape similarity (src_size => tgt_size)
+def inst_match_score(src_inst, tgt_inst, config):
+    """
     """
     src_mask, tgt_mask = src_inst['mask'], tgt_inst['mask']
 
@@ -26,10 +26,19 @@ def inst_match_score(src_inst, tgt_inst):
     tgt_size = (tgt_mask.shape[1], tgt_mask.shape[0])
     scale_w, scale_h = src_size[0] / tgt_size[0], src_size[1] / tgt_size[1]
 
-    if scale_w < 0.5 or scale_h < 0.5:
+    # too small
+    hw_scale = config.get('th_hw_scale', 0.7)
+    if scale_w < hw_scale or scale_h < hw_scale:
         return 0.0
     
-    # mask similarity
+    # aspect ratio gap is too large
+    aspect_ratio_src = src_size[0] / src_size[1]
+    aspect_ratio_tgt = tgt_size[0] / tgt_size[1]
+
+    if abs(aspect_ratio_src-aspect_ratio_tgt) > config.get('th_aspect_ratio_gap', 0.2):
+        return 0.0
+
+    # shape similarity (src_size => tgt_size)
     src_mask = Image.fromarray(src_mask)
     src_mask = np.array(src_mask.resize(tgt_size))
     sim = (src_mask * tgt_mask).sum() / ((src_mask+tgt_mask) != 0).sum()
@@ -115,7 +124,7 @@ def run_augment(config):
             src_inst = instances[instance_key]
             # key = frozenset({tgt_inst['id'], src_inst['id']})
             # match_score = inst_scores[cat][key]
-            match_score = inst_match_score(src_inst, tgt_inst)
+            match_score = inst_match_score(src_inst, tgt_inst, config)
             if match_score > th_matchscore:
                 aug_image, aug_captions = augment_template_with_instance(template, src_inst, f"{inpaint_dir}/{template['imgid']}-{template['inst_id']}_mask.png")
                 aug_image.save(f'{output_dir}/{template_key}-{instance_key}.jpg')

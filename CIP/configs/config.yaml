@@ -20,15 +20,34 @@ analysis:
   
 # data augmentation
 
-tmp_path: tmp/small-dataset-rm_small_obj/
+tmp_path: tmp/small-dataset-tree-rm_small_obj/
+
+experimental:
+  inst_desc_match:
+    word2vec: /data2/private/cc/wheels/GoogleNews-vectors-negative300.bin
+    image_path: /data2/share/data/coco/images/train2017
+    caption_annotation: /data2/share/data/coco/annotations/small_dataset/captions_train.json
+    instance_annotation: /data2/share/data/coco/annotations/small_dataset/instances_train.json
+    output_dir: tmp/test/idm
+
+extract_tree:
+  stanza_dir: /data2/private/cc/experiment/ViLT/CIP/checkpoints/stanza
+  caption_annotation: /data2/share/data/coco/annotations/small_dataset/captions_train.json
+  instance_annotation: /data2/share/data/coco/annotations/small_dataset/instances_train.json
+  output_dir: tmp
 
 inst_desc_match:
   word2vec: /data2/private/cc/wheels/GoogleNews-vectors-negative300.bin
+  tree_path: ${extract_tree.output_dir}/id2tree.json
   image_path: /data2/share/data/coco/images/train2017
   caption_annotation: /data2/share/data/coco/annotations/small_dataset/captions_train.json
   instance_annotation: /data2/share/data/coco/annotations/small_dataset/instances_train.json
   output_dir: ${tmp_path}/idm_results
   th_wordsim: 0.5
+  th_coverage: 
+    - 0.1
+    - 0.7
+  visualize: True
 
 phrase_grounding:
   image_path: /data2/share/data/coco/images/train2017
@@ -46,10 +65,10 @@ crop_inpaint:
     indir: ${crop_inpaint.template_path}
     outdir: ${tmp_path}/inpaint_images
     device: 
-      - cuda:1
-      - cuda:2
+      - cuda:4
       - cuda:5
       - cuda:6
+      - cuda:7
 
 augment:
   k: 1

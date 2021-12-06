@@ -1,4 +1,4 @@
-from vilt.datasets import F30KCaptionKarpathyDataset
+from vilt.datasets import F30KCaptionKarpathyDataset, F30KCIPDataset
 from .datamodule_base import BaseDataModule
 
 
@@ -17,3 +17,19 @@ class F30KCaptionKarpathyDataModule(BaseDataModule):
     @property
     def dataset_name(self):
         return "f30k"
+
+class F30KCIPDataModule(BaseDataModule):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @property
+    def dataset_cls(self):
+        return F30KCIPDataset
+
+    @property
+    def dataset_cls_no_false(self):
+        return F30KCIPDataset
+
+    @property
+    def dataset_name(self):
+        return "f30k_cip"
