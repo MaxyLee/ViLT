@@ -1,3 +1,4 @@
+from genericpath import exists
 import os
 import json
 import torch
@@ -16,6 +17,7 @@ from matplotlib.patches import Polygon
 from skimage.measure import find_contours
 
 from inst_desc_match import IDMAnn, save_idmanns
+from f30k_utils import get_sentence_data, get_annotations
 from coco_utils import draw_captions, image_vcat, loadCaptions, loadImage, draw_instance_bbox
 
 torch.set_grad_enabled(False)
@@ -77,6 +79,38 @@ def apply_mask(image, mask, color, alpha=0.5):
                                   (1 - alpha) + alpha * color[c] * 255,
                                   image[:, :, c])
     return image
+
+def plot_results_plt(pil_img, scores, boxes, labels, masks=None, fn='result'):
+    plt.figure(figsize=(16,10))
+    np_image = np.array(pil_img)
+    ax = plt.gca()
+    colors = COLORS * 100
+    if masks is None:
+      masks = [None for _ in range(len(scores))]
+    assert len(scores) == len(boxes) == len(labels) == len(masks)
+    for s, (xmin, ymin, xmax, ymax), l, mask, c in zip(scores, boxes.tolist(), labels, masks, colors):
+        ax.add_patch(plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin,
+                                   fill=False, color=c, linewidth=3))
+        text = f'{l}: {s:0.2f}'
+        ax.text(xmin, ymin, text, fontsize=15, bbox=dict(facecolor='white', alpha=0.8))
+
+        if mask is None:
+          continue
+        np_image = apply_mask(np_image, mask, c)
+
+        padded_mask = np.zeros((mask.shape[0] + 2, mask.shape[1] + 2), dtype=np.uint8)
+        padded_mask[1:-1, 1:-1] = mask
+        contours = find_contours(padded_mask, 0.5)
+        for verts in contours:
+          # Subtract the padding and flip (y, x) to (x, y)
+          verts = np.fliplr(verts) - 1
+          p = Polygon(verts, facecolor="none", edgecolor=c)
+          ax.add_patch(p)
+
+
+    plt.imshow(np_image)
+    plt.axis('off')
+    plt.savefig(fn)
 
 def plot_results(pil_img, scores, boxes, labels, masks=None, caption=None, fn='result'):
     # plt.figure(figsize=(16,10))
@@ -172,7 +206,7 @@ def plot_inference(im, caption, fn):
     scores, boxes, labels = inference(im, caption)
     plot_results(im, scores, boxes, labels, caption=caption, fn=fn)
 
-def plot_inference_segmentation(im, caption):
+def inference_segmentation(im, caption, model_pc):
     # mean-std normalize the input image (batch-size: 1)
     img = transform(im).unsqueeze(0).cuda()
 
@@ -194,17 +228,26 @@ def plot_inference_segmentation(im, caption):
     tokenized = model_pc.detr.transformer.tokenizer.batch_encode_plus([caption], padding="longest", return_tensors="pt").to(img.device)
 
     # Extract the text spans predicted by each box
+
     positive_tokens = (outputs["pred_logits"].cpu()[0, keep].softmax(-1) > 0.1).nonzero().tolist()
     predicted_spans = defaultdict(str)
     for tok in positive_tokens:
         item, pos = tok
         if pos < 255:
-            span = tokenized.token_to_chars(0, pos)
-            predicted_spans [item] += " " + caption[span.start:span.end]
+            try:
+                span = tokenized.token_to_chars(0, pos)
+                predicted_spans [item] += " " + caption[span.start:span.end]
+            except:
+                print('whoops')
+
 
     labels = [predicted_spans [k] for k in sorted(list(predicted_spans .keys()))]
-    plot_results(im, probas[keep], bboxes_scaled, labels, masks)
-    return outputs
+    return probas[keep], bboxes_scaled, labels, masks
+
+def plot_inference_segmentation(im, caption):
+    scores, boxes, labels, masks = inference_segmentation(im, caption)
+    plot_results(im, scores, boxes, labels, masks)
+    # return outputs
 
 def get_bbox_area(bbox):
     return (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
@@ -343,6 +386,55 @@ def run_phrase_grounding(config, output_dir=None):
     #     save_idmanns(idmAnns, config, output_dir=output_dir)
     return idmAnns
 
+def run_segmentation(config, output_dir=None):
+    root = config['root']
+    output_dir = output_dir or config['output_dir']
+    img_path = f'{root}/flickr30k-images'
+    ann_path = f'{root}/Annotations'
+    cap_path = f'{root}/Sentences'
+
+    with open(f'{root}/karpathy/dataset_flickr30k.json', 'r') as f:
+        dataset = json.load(f)
+    images = dataset['images']
+
+    imgids = [img['filename'][:-4] for img in images if img['split'] == 'train']
+
+    # load model
+    model_pc = torch.hub.load('ashkamath/mdetr:main', 'mdetr_efficientnetB3_phrasecut', pretrained=False, return_postprocessor=False)
+    ckpt = torch.load('checkpoints/phrasecut_EB3_checkpoint.pth')
+    model_pc.load_state_dict(ckpt['model'])
+    model_pc = model_pc.cuda()
+    model_pc.eval()
+
+    imgids = ['4797050581', '3923857105', '2652311904']
+    for imgid in tqdm(imgids):
+        img = Image.open(f'{img_path}/{imgid}.jpg')
+        anns = get_annotations(f'{ann_path}/{imgid}.xml')
+        caps = get_sentence_data(f'{cap_path}/{imgid}.txt')
+
+        segms = []
+        phrase_ids = list(anns['boxes'].keys())
+        for cap in caps:
+            segm = {}
+            for p in cap['phrases']:
+                if p['phrase_id'] in phrase_ids:
+                    scores, boxes, labels, masks = inference_segmentation(img, p['phrase'].lower(), model_pc)
+                    segm[p['phrase_id']] = {
+                        'scores': scores,
+                        'boxes': boxes,
+                        'labels': labels,
+                        'masks': masks
+                    }
+            segms.append(segm)
+        import ipdb; ipdb.set_trace()
+                    # import ipdb; ipdb.set_trace()
+                # plot_results_plt(img, scores, boxes, labels, masks, fn='tmp/test')
+        # with open(f'{output_dir}/{imgid}.json', 'w') as f:
+        #     json.dump(segm, f)
+        torch.save(segm, f'{output_dir}/{imgid}')
+                    
+
+
 if __name__ == '__main__':
     print('[Run]: phrase grounding with MDETR')
     # load mdetr model
@@ -357,15 +449,16 @@ if __name__ == '__main__':
     # plot_inference(im, "5 people each holding an umbrella", 'tmp/mdetr/example')
 
     # load data
-    root = '/data2/share/data/coco'
+    root = '/data/share/data/coco'
     save_path = 'tmp/mdetr'
-    caps = json.load(open(f'{root}/annotations/small_dataset/captions_train.json'))
+    caps = json.load(open(f'{root}/annotations/captions_train2017.json'))
     anns = caps['annotations']
 
     for ann in tqdm(anns[:50]):
         img_path = f"{root}/images/train2017/{str(ann['image_id']).zfill(12)}.jpg"
         im = Image.open(img_path)
         fn = f"{save_path}/{ann['image_id']}-{ann['id']}"
-        plot_inference(im, ann['caption'].lower(), fn)
+        # plot_inference(im, ann['caption'].lower(), fn)
+        scores, boxes, labels = inference(im, ann['caption'].lower(), model)
 
-    import ipdb; ipdb.set_trace()
+        import ipdb; ipdb.set_trace()

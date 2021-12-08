@@ -1,6 +1,7 @@
 import re
 import enum
 import json
+import torch
 import pickle
 import os, random, copy, time
 import argparse
@@ -19,7 +20,7 @@ from coco_utils import (
     bbox2xy, loadImage, loadCaptions,
     image_vcat, image_hcat, draw_instance_bbox, draw_captions
 )
-from f30k_utils import get_sentence_data, get_annotations
+from f30k_utils import get_sentence_data, get_annotations, get_segmentation
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -70,7 +71,7 @@ class IDMAnn:
 
     @classmethod
     def get_instances(cls, image_path, imgid, mapped_anns):
-        image = loadImage(image_path, imgid)
+        image = Image.open(f'{image_path}/{imgid}.jpg')
         all_instances = []
         for ann in mapped_anns:
             x1, y1, x2, y2 = bbox2xy(ann['bbox'])
@@ -85,6 +86,60 @@ class IDMAnn:
                 'subject_descs': None,     # ['a dog jumping', 'a small puppy playing with a frisbee']
                 'attr': {
                     'category': ann['category'], # {supercategory, ..}
+                    'vbg': None
+                }
+            }
+            all_instances.append(instance)
+        return all_instances
+
+    @classmethod
+    def from_f30k_anns(cls, image_path, imgid, captions, anns, segm):
+        all_templates = cls.get_f30k_templates(imgid, captions, anns)
+        all_instances = cls.get_f30k_instances(image_path, imgid, captions, anns, segm)
+
+        return cls(image_path, imgid, all_templates, all_instances)
+
+    @classmethod
+    def get_f30k_templates(cls, imgid, captions, anns):
+        all_templates = []
+        img_size = anns['width'] * anns['height']
+        for phrase_id, bbox in anns['boxes'].items():
+            template = {
+                'imgid': imgid,
+                'inst_id': phrase_id,
+                'bbox': bbox[0], # use first bbox
+                'img_size': img_size,
+                'object_template_captions': f30k_template_captions(captions, phrase_id)
+            }
+            all_templates.append(template)
+        return all_templates
+
+    @classmethod
+    def get_f30k_instances(cls, image_path, imgid, captions, anns, segm):
+        all_instances = []
+        image = Image.open(f'{image_path}/{imgid}.jpg')
+
+        for phrase_id, bbox in anns['boxes'].items():
+            x1, y1, x2, y2 = bbox[0]
+            region = image.crop(bbox[0])
+            try:
+                mask = segm[phrase_id]['masks'][0, y1:y2, x1:x2].type(torch.uint8).numpy()
+            except:
+                # print('whoops')
+                continue
+            all_descs = [phrase['phrase'] for cap in captions for phrase in cap['phrases'] if phrase['phrase_id'] == phrase_id]
+            for cap in captions:
+                for phrase in cap['phrases']:
+                    if phrase['phrase_id'] == phrase_id:
+                        phrase_type = phrase['phrase_type'][0]
+            instance = {
+                'id': phrase_id,
+                'region': np.array(region),
+                'mask': mask,
+                'object_descs': all_descs, # ['a dog', 'a small puppy']
+                'subject_descs': None,     # ['a dog jumping', 'a small puppy playing with a frisbee']
+                'attr': {
+                    'category': phrase_type, # {supercategory, ..}
                     'vbg': None
                 }
             }
@@ -227,11 +282,13 @@ def noun2np(tree):
 def location_parse(pos_tags):
     pass
 
-def inst_desc_match_f30k():
-    root = '/data2/share/data/flickr30k-entities'
+def inst_desc_match_f30k(config, output_dir=None):
+    print('[Run]: instance-description matching on f30k')
+    root = config['root']
     img_path = f'{root}/flickr30k-images'
     ann_path = f'{root}/Annotations'
     cap_path = f'{root}/Sentences'
+    seg_path = config['seg_path']
 
     with open(f'{root}/karpathy/dataset_flickr30k.json', 'r') as f:
         dataset = json.load(f)
@@ -241,17 +298,33 @@ def inst_desc_match_f30k():
 
     idmAnns = []
     for imgid in tqdm(imgids):
-        img = Image.open(f'{img_path}/{imgid}.jpg')
         anns = get_annotations(f'{ann_path}/{imgid}.xml')
         caps = get_sentence_data(f'{cap_path}/{imgid}.txt')
+        segm = get_segmentation(f'{seg_path}/{imgid}')
 
+        idmAnn = IDMAnn.from_f30k_anns(img_path, imgid, caps, anns, segm)
+        # if len(idmAnn.templates) == 0 or idmAnn.instances == 0:
+            # import ipdb; ipdb.set_trace()
 
-        # for phrase_id, boxes in anns['boxes'].items():
-        #     for bbox in boxes:
-        #         img = draw_instance_bbox(img, bbox, label=phrase_id)
+        idmAnns.append(idmAnn)
 
-        # img.save('tmp/f30k_test.jpg')
-        import ipdb; ipdb.set_trace()
+    if output_dir is not None:
+        os.makedirs(output_dir, exist_ok=True)
+        save_idmanns(idmAnns, config, output_dir=output_dir)
+    elif 'output_dir' in config:
+        output_dir = config['output_dir']
+        os.makedirs(output_dir, exist_ok=True)
+        save_idmanns(idmAnns, config, output_dir=output_dir)
+
+    if config.get('visualize', False):
+        os.makedirs(f'{output_dir}/result_imgs', exist_ok=True)
+        idxs = random.sample(range(len(idmAnns)), 1000)
+        for idx in tqdm(idxs, desc='Draw Templates'):
+            idmAnn = idmAnns[idx]
+            template = idmAnn.draw_templates_image()
+            instance = idmAnn.draw_instances_image()
+            image = image_vcat([template, instance])
+            image.save(f'{output_dir}/result_imgs/{idmAnn.imgid}.png')
 
     return idmAnns
 
@@ -405,6 +478,17 @@ def run_inst_desc_match(config, output_dir=None):
 
 ############# Visualization Functions #############
 
+def f30k_template_captions(captions, phrase_id):
+    annoted_captions = []
+    for cap in captions:
+        sentence = cap['sentence']
+        for phrase in cap['phrases']:
+            if phrase['phrase_id'] == phrase_id:
+                sentence = sentence[:phrase['first_word_index']] + '[OBJ]' + sentence[phrase['first_word_index']+len(phrase['phrase']):]
+                break
+        annoted_captions.append(sentence)
+    return annoted_captions
+
 def template_captions(caption_tokens, inst_desc_mapping):
     """
     Args:
@@ -429,6 +513,8 @@ def template_captions(caption_tokens, inst_desc_mapping):
                 annoted_caption.append(token)
             else:
                 annoted_caption.append(token)
+        if token == '_' and inside_flag:
+            annoted_caption.append('[OBJ]')
         annoted_captions.append(' '.join(annoted_caption))
     return annoted_captions
 

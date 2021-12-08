@@ -1,3 +1,4 @@
+import torch
 import xml.etree.ElementTree as ET
 
 def get_sentence_data(fn):
@@ -115,4 +116,5 @@ def get_annotations(fn):
 
     return anno_info
 
-
+def get_segmentation(fn):
+    return torch.load(fn)

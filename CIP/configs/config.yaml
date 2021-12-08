@@ -20,7 +20,7 @@ analysis:
   
 # data augmentation
 
-tmp_path: tmp/small-dataset-tree-rm_small_obj/
+tmp_path: tmp/f30k/
 
 experimental:
   inst_desc_match:
@@ -29,6 +29,10 @@ experimental:
     caption_annotation: /data2/share/data/coco/annotations/small_dataset/captions_train.json
     instance_annotation: /data2/share/data/coco/annotations/small_dataset/instances_train.json
     output_dir: tmp/test/idm
+
+segmentation:
+  root: /data/share/UNITER/origin_imgs/flickr30k
+  output_dir: tmp/Segmentations
 
 extract_tree:
   stanza_dir: /data2/private/cc/experiment/ViLT/CIP/checkpoints/stanza
@@ -49,6 +53,12 @@ inst_desc_match:
     - 0.7
   visualize: True
 
+inst_desc_match_f30k:
+  root: /data/share/UNITER/origin_imgs/flickr30k
+  image_path: /data/share/UNITER/origin_imgs/flickr30k/flickr30k-images
+  seg_path: ${segmentation.output_dir}
+  output_dir: ${tmp_path}/idm_results
+
 phrase_grounding:
   image_path: /data2/share/data/coco/images/train2017
   caption_annotation: /data2/share/data/coco/annotations/small_dataset/captions_train.json
@@ -57,7 +67,7 @@ phrase_grounding:
   th_bbox_overlap: 0.8
 
 crop_inpaint:
-  template_annotation: ${inst_desc_match.output_dir}/templates.json
+  template_annotation: ${inst_desc_match_f30k.output_dir}/templates.json
   template_path: ${tmp_path}/origin_images
   inpaint:
     code_path: /data2/private/cc/experiment/lama
@@ -65,10 +75,10 @@ crop_inpaint:
     indir: ${crop_inpaint.template_path}
     outdir: ${tmp_path}/inpaint_images
     device: 
-      - cuda:4
-      - cuda:5
-      - cuda:6
-      - cuda:7
+      - cuda:0
+      - cuda:1
+      - cuda:2
+      - cuda:3
 
 augment:
   k: 1
