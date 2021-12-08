@@ -71,7 +71,7 @@ class IDMAnn:
 
     @classmethod
     def get_instances(cls, image_path, imgid, mapped_anns):
-        image = Image.open(f'{image_path}/{imgid}.jpg')
+        image = loadImage(image_path, imgid)
         all_instances = []
         for ann in mapped_anns:
             x1, y1, x2, y2 = bbox2xy(ann['bbox'])
@@ -102,7 +102,7 @@ class IDMAnn:
     @classmethod
     def get_f30k_templates(cls, imgid, captions, anns):
         all_templates = []
-        img_size = anns['width'] * anns['height']
+        img_size = (anns['height'], anns['width'])
         for phrase_id, bbox in anns['boxes'].items():
             template = {
                 'imgid': imgid,
@@ -118,7 +118,6 @@ class IDMAnn:
     def get_f30k_instances(cls, image_path, imgid, captions, anns, segm):
         all_instances = []
         image = Image.open(f'{image_path}/{imgid}.jpg')
-
         for phrase_id, bbox in anns['boxes'].items():
             x1, y1, x2, y2 = bbox[0]
             region = image.crop(bbox[0])

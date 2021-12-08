@@ -54,8 +54,8 @@ inst_desc_match:
   visualize: True
 
 inst_desc_match_f30k:
-  root: /data/share/UNITER/origin_imgs/flickr30k
-  image_path: /data/share/UNITER/origin_imgs/flickr30k/flickr30k-images
+  root: /data2/share/data/flickr30k-entities
+  image_path: /data2/share/data/flickr30k-entities/flickr30k-images
   seg_path: ${segmentation.output_dir}
   output_dir: ${tmp_path}/idm_results
 
@@ -75,10 +75,10 @@ crop_inpaint:
     indir: ${crop_inpaint.template_path}
     outdir: ${tmp_path}/inpaint_images
     device: 
-      - cuda:0
-      - cuda:1
-      - cuda:2
-      - cuda:3
+      - cuda:4
+      - cuda:5
+      - cuda:6
+      - cuda:7
 
 augment:
   k: 1

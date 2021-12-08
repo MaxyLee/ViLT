@@ -99,7 +99,8 @@ def run_augment(config):
 
     cat2ids = defaultdict(list)
     for iid, ins in instances.items():
-        cat = ins['attr']['category']['name']
+        # cat = ins['attr']['category']['name']
+        cat = ins['attr']['category']
         cat2ids[cat].append(iid)
 
     # inst_scores = get_inst_scores(idm_dir, instances, cat2ids)
@@ -113,8 +114,11 @@ def run_augment(config):
     for template_key in tqdm(templates, desc='Augment Templates'):
         t_cnt = 0
         template = templates[template_key]
+        if template_key not in instances:
+            continue
         tgt_inst = instances[template_key]
-        cat = tgt_inst['attr']['category']['name']
+        # cat = tgt_inst['attr']['category']['name']
+        cat = tgt_inst['attr']['category']
         same_cat_instances = cat2ids[cat]
         for instance_key in same_cat_instances:
             if t_cnt >= k:
