@@ -5,8 +5,10 @@ import skimage.io as io
 from PIL import Image
 from torchvision.transforms.functional import scale
 import numpy as np
+import multiprocessing
 
 from tqdm import tqdm
+from joblib import Parallel, delayed
 
 from coco_utils import (
     bbox2xy, loadImage, loadCaptions,
@@ -87,56 +89,110 @@ def get_inst_scores(idm_dir, instances, cat2ids):
             pickle.dump(inst_scores, f)
     return inst_scores
 
+def test_fun(i, config):
+    print(f'test function {i}')
+    return i
+
 def run_augment(config):
     print('[Run]: augmentation')
     random.seed(config['seed'])
-    k = config['k']
     idm_dir = config['idm_dir']
-    inpaint_dir = config['inpaint_dir']
     output_dir = config['output_dir']
-    th_matchscore = config['th_matchscore']
+    num_processes = config['num_processes']
+
+    print('loading templates and instances')
     templates, instances, idm_config = load_idmanns(idm_dir)
 
     cat2ids = defaultdict(list)
     for iid, ins in instances.items():
-        # cat = ins['attr']['category']['name']
-        cat = ins['attr']['category']
+        if 'f30k' in output_dir:
+            cat = ins['attr']['category']
+        else:
+            cat = ins['attr']['category']['name']
         cat2ids[cat].append(iid)
 
-    # inst_scores = get_inst_scores(idm_dir, instances, cat2ids)
-
     os.makedirs(output_dir, exist_ok=True)
-    fout = open(f'{output_dir}/captions.txt', 'w')
 
-    print(f'Max num per image: {k}')
+    def augmentation(i, keys):
+        k = config['k']
+        inpaint_dir = config['inpaint_dir']
+        output_dir = config['output_dir']
+        th_matchscore = config['th_matchscore']
 
-    int = 0
-    for template_key in tqdm(templates, desc='Augment Templates'):
-        t_cnt = 0
-        template = templates[template_key]
-        if template_key not in instances:
-            continue
-        tgt_inst = instances[template_key]
-        # cat = tgt_inst['attr']['category']['name']
-        cat = tgt_inst['attr']['category']
-        same_cat_instances = cat2ids[cat]
-        for instance_key in same_cat_instances:
-            if t_cnt >= k:
-                break
-            if instance_key == template_key:
+        cnt = 0
+        fout = open(f'{output_dir}/captions_{i}.txt', 'w')
+        for template_key in tqdm(keys, desc=f'Augment Templates {i}'):
+            t_cnt = 0
+            template = templates[template_key]
+            if template_key not in instances:
                 continue
-            src_inst = instances[instance_key]
-            # key = frozenset({tgt_inst['id'], src_inst['id']})
-            # match_score = inst_scores[cat][key]
-            match_score = inst_match_score(src_inst, tgt_inst, config)
-            if match_score > th_matchscore:
-                aug_image, aug_captions = augment_template_with_instance(template, src_inst, f"{inpaint_dir}/{template['imgid']}-{template['inst_id']}_mask.png")
-                aug_image.save(f'{output_dir}/{template_key}-{instance_key}.jpg')
-                fout.write(f'{output_dir}/{template_key}-{instance_key}.jpg:\t{aug_captions}\n')
-                int += 1
-                t_cnt += 1
+            tgt_inst = instances[template_key]
+            if 'f30k' in output_dir:
+                cat = tgt_inst['attr']['category']
+            else:
+                cat = tgt_inst['attr']['category']['name']
+            same_cat_instances = cat2ids[cat]
+            for instance_key in same_cat_instances:
+                if t_cnt >= k:
+                    break
+                if instance_key == template_key:
+                    continue
+                src_inst = instances[instance_key]
+                # key = frozenset({tgt_inst['id'], src_inst['id']})
+                # match_score = inst_scores[cat][key]
+                match_score = inst_match_score(src_inst, tgt_inst, config)
+                if match_score > th_matchscore:
+                    aug_image, aug_captions = augment_template_with_instance(template, src_inst, f"{inpaint_dir}/{template['imgid']}-{template['inst_id']}_mask.png")
+                    aug_image.save(f'{output_dir}/{template_key}-{instance_key}.jpg')
+                    fout.write(f'{output_dir}/{template_key}-{instance_key}.jpg:\t{aug_captions}\n')
+                    cnt += 1
+                    t_cnt += 1
+        fout.close()
+        return cnt
+    
+    print('augmentation')
+    if num_processes == 1:
+        cnt = augmentation(0, templates.keys())
+    else:
+        split_keys = np.array_split(list(templates.keys()), num_processes)
+        cnts = Parallel(n_jobs=num_processes)(delayed(augmentation)(i, split_keys[i]) for i in range(num_processes))
+        # test = Parallel(n_jobs=num_processes)(delayed(test_fun)(i, config) for i in range(num_processes))
+        cnt = sum(cnts)
 
-    print(f'total augmented pairs: {int}')
+    with open(f'{output_dir}/captions.txt', 'w') as fout:
+        for i in range(num_processes):
+            with open(f'{output_dir}/captions_{i}.txt', 'r') as fin:
+                for line in fin:
+                    fout.write(line)
+
+    print(f'total augmented pairs: {cnt}')
+    # int = 0
+    # for template_key in tqdm(templates, desc='Augment Templates'):
+    #     t_cnt = 0
+    #     template = templates[template_key]
+    #     if template_key not in instances:
+    #         continue
+    #     tgt_inst = instances[template_key]
+    #     if 'f30k' in output_dir:
+    #         cat = tgt_inst['attr']['category']
+    #     else:
+    #         cat = tgt_inst['attr']['category']['name']
+    #     same_cat_instances = cat2ids[cat]
+    #     for instance_key in same_cat_instances:
+    #         if t_cnt >= k:
+    #             break
+    #         if instance_key == template_key:
+    #             continue
+    #         src_inst = instances[instance_key]
+    #         # key = frozenset({tgt_inst['id'], src_inst['id']})
+    #         # match_score = inst_scores[cat][key]
+    #         match_score = inst_match_score(src_inst, tgt_inst, config)
+    #         if match_score > th_matchscore:
+    #             aug_image, aug_captions = augment_template_with_instance(template, src_inst, f"{inpaint_dir}/{template['imgid']}-{template['inst_id']}_mask.png")
+    #             aug_image.save(f'{output_dir}/{template_key}-{instance_key}.jpg')
+    #             fout.write(f'{output_dir}/{template_key}-{instance_key}.jpg:\t{aug_captions}\n')
+    #             int += 1
+    #             t_cnt += 1
 
 if __name__ == '__main__':
     pass

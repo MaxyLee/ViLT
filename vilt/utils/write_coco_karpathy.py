@@ -28,7 +28,7 @@ def make_cip(root, cip_root, name=None):
 
     table = pa.Table.from_pandas(dataframe)
     os.makedirs(root, exist_ok=True)
-    fn = f'coco_rand_train_cip_{name}.arrow' if name else 'coco_rand_train_cip.arrow'
+    fn = f'{name}.arrow' if name else 'coco_rand_train_cip.arrow'
     with pa.OSFile(f"{root}/{fn}", "wb") as sink:
         with pa.RecordBatchFileWriter(sink, table.schema) as writer:
             writer.write_table(table)
@@ -152,6 +152,6 @@ if __name__ == '__main__':
     # root = '/data/share/UNITER/origin_imgs/coco_original'
     # make_subset(root)
     root = '/data2/share/data/ViLT/data/COCO'
-    cip_root = '/data/private/mxy/projects/mmda/code/ViLT/CIP/tmp/small-dataset-tree-rm_small_obj/augment_results'
+    cip_root = '/data1/private/mxy/projects/mmda/code/ViLT/CIP/tmp/coco/augment_results'
     # cip_root = '/data2/private/cc/experiment/ViLT/CIP/tmp/small-dataset-rm_small_obj/augment_results'
-    make_cip(root, cip_root, name='tree-rm_small_obj')
+    make_cip(root, cip_root, name='coco_train_cip_tree')

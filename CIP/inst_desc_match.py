@@ -1,3 +1,4 @@
+from collections import defaultdict
 import re
 import enum
 import json
@@ -287,7 +288,8 @@ def inst_desc_match_f30k(config, output_dir=None):
     img_path = f'{root}/flickr30k-images'
     ann_path = f'{root}/Annotations'
     cap_path = f'{root}/Sentences'
-    seg_path = config['seg_path']
+    seg_path = f'{root}/Segmentations'
+    th_coverage = config.get('th_coverage', [0.1, 0.7])
 
     with open(f'{root}/karpathy/dataset_flickr30k.json', 'r') as f:
         dataset = json.load(f)
@@ -301,10 +303,18 @@ def inst_desc_match_f30k(config, output_dir=None):
         caps = get_sentence_data(f'{cap_path}/{imgid}.txt')
         segm = get_segmentation(f'{seg_path}/{imgid}')
 
-        idmAnn = IDMAnn.from_f30k_anns(img_path, imgid, caps, anns, segm)
-        # if len(idmAnn.templates) == 0 or idmAnn.instances == 0:
-            # import ipdb; ipdb.set_trace()
+        img_area = anns['height'] * anns['width']
 
+        filtered_boxes = defaultdict(list)
+        for phrase_id, boxes in anns['boxes'].items():
+            for box in boxes:
+                box_area = (box[3] - box[1]) * (box[2] - box[0])
+                coverage = float(box_area) / img_area
+                if coverage > th_coverage[0] and coverage < th_coverage[1]:
+                    filtered_boxes[phrase_id].append(box)
+        anns['boxes'] = filtered_boxes
+
+        idmAnn = IDMAnn.from_f30k_anns(img_path, imgid, caps, anns, segm)
         idmAnns.append(idmAnn)
 
     if output_dir is not None:

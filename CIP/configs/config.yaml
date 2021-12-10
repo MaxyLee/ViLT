@@ -20,7 +20,7 @@ analysis:
   
 # data augmentation
 
-tmp_path: tmp/f30k/
+tmp_path: tmp/coco/
 
 experimental:
   inst_desc_match:
@@ -36,16 +36,20 @@ segmentation:
 
 extract_tree:
   stanza_dir: /data2/private/cc/experiment/ViLT/CIP/checkpoints/stanza
-  caption_annotation: /data2/share/data/coco/annotations/small_dataset/captions_train.json
-  instance_annotation: /data2/share/data/coco/annotations/small_dataset/instances_train.json
+  # caption_annotation: /data2/share/data/coco/annotations/small_dataset/captions_train.json
+  # instance_annotation: /data2/share/data/coco/annotations/small_dataset/instances_train.json
+  caption_annotation: /data2/share/data/coco/annotations/captions_train2017.json
+  instance_annotation: /data2/share/data/coco/annotations/instances_train2017.json
   output_dir: tmp
 
 inst_desc_match:
   word2vec: /data2/private/cc/wheels/GoogleNews-vectors-negative300.bin
   tree_path: ${extract_tree.output_dir}/id2tree.json
   image_path: /data2/share/data/coco/images/train2017
-  caption_annotation: /data2/share/data/coco/annotations/small_dataset/captions_train.json
-  instance_annotation: /data2/share/data/coco/annotations/small_dataset/instances_train.json
+  # caption_annotation: /data2/share/data/coco/annotations/small_dataset/captions_train.json
+  # instance_annotation: /data2/share/data/coco/annotations/small_dataset/instances_train.json
+  caption_annotation: /data2/share/data/coco/annotations/captions_train2017.json
+  instance_annotation: /data2/share/data/coco/annotations/instances_train2017.json
   output_dir: ${tmp_path}/idm_results
   th_wordsim: 0.5
   th_coverage: 
@@ -56,7 +60,6 @@ inst_desc_match:
 inst_desc_match_f30k:
   root: /data2/share/data/flickr30k-entities
   image_path: /data2/share/data/flickr30k-entities/flickr30k-images
-  seg_path: ${segmentation.output_dir}
   output_dir: ${tmp_path}/idm_results
 
 phrase_grounding:
@@ -67,7 +70,7 @@ phrase_grounding:
   th_bbox_overlap: 0.8
 
 crop_inpaint:
-  template_annotation: ${inst_desc_match_f30k.output_dir}/templates.json
+  template_annotation: ${inst_desc_match.output_dir}/templates.json
   template_path: ${tmp_path}/origin_images
   inpaint:
     code_path: /data2/private/cc/experiment/lama
@@ -75,8 +78,6 @@ crop_inpaint:
     indir: ${crop_inpaint.template_path}
     outdir: ${tmp_path}/inpaint_images
     device: 
-      - cuda:4
-      - cuda:5
       - cuda:6
       - cuda:7
 
@@ -88,6 +89,7 @@ augment:
   # inpaint_dir: ${crop_inpaint.template_path}
   output_dir: ${tmp_path}/augment_results
   th_matchscore: 0.7
+  num_processes: 1
 
 evaluate:
   data_dir: ${augment.output_dir}
