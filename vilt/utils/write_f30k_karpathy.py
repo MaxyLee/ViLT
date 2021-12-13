@@ -28,7 +28,7 @@ def make_cip(root, cip_root, name=None):
 
     table = pa.Table.from_pandas(dataframe)
     os.makedirs(root, exist_ok=True)
-    fn = f'f30k_train_cip_{name}.arrow' if name else 'f30k_train_cip.arrow'
+    fn = f'{name}.arrow' if name else 'f30k_train_cip.arrow'
     with pa.OSFile(f"{root}/{fn}", "wb") as sink:
         with pa.RecordBatchFileWriter(sink, table.schema) as writer:
             writer.write_table(table)
@@ -101,6 +101,5 @@ def make_arrow(root, dataset_root):
 
 if __name__ == '__main__':
     root = '/data2/share/data/ViLT/data/flickr30k'
-    cip_root = '/data/private/mxy/projects/mmda/code/ViLT/CIP/tmp/small-dataset-tree/augment_results'
-    # cip_root = '/data2/private/cc/experiment/ViLT/CIP/tmp/small-dataset-rm_small_obj/augment_results'
-    make_cip(root, cip_root, name='tree')
+    cip_root = '/data1/private/mxy/projects/mmda/code/ViLT/CIP/tmp/f30k/augment_results'
+    make_cip(root, cip_root, name='f30k_train_cip_tree')

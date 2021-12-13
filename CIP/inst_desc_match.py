@@ -316,7 +316,7 @@ def inst_desc_match_f30k(config, output_dir=None):
 
         idmAnn = IDMAnn.from_f30k_anns(img_path, imgid, caps, anns, segm)
         idmAnns.append(idmAnn)
-
+    
     if output_dir is not None:
         os.makedirs(output_dir, exist_ok=True)
         save_idmanns(idmAnns, config, output_dir=output_dir)

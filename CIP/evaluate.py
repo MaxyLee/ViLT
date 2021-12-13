@@ -1,22 +1,44 @@
+from collections import defaultdict
 import json
+import random
+import shutil
 from sys import base_prefix
 import numpy as np
 
 from tqdm import tqdm
 from clip_score import CLIPScore
+from collections import defaultdict
 
-def origin_clip_scores():
-    caption_file = '/data2/share/data/coco/annotations/small_dataset/captions_train.json'
-    with open(caption_file) as f:
-        captions = json.load(f)
-    captions = captions['images']
+def sample_images(inpath, outpath):
+    random.seed(0)
 
-    clip_score = CLIPScore(device='cuda:1')
+    with open(f'{inpath}/captions.txt', 'r') as fin:
+        lines = fin.readlines()
 
-    base_path = '/data2/share/data/coco/images/train2017'
-    scores = {}
-    for img in tqdm(captions):
-        img_path = f"{base_path}/{img['file_name']}"
+    sampled_lines = random.sample(lines, 100)
+
+    with open(f'{outpath}/sampled_captions', 'w') as fout:
+        for line in sampled_lines:
+            image_fn, captions = line.strip().split(':\t')
+            image_fn = image_fn.split('/')[-1]
+            shutil.copyfile(f'{inpath}/{image_fn}', f'{outpath}/{image_fn}')
+            fout.write(line)
+        
+
+
+def convert_caption_format(input, output):
+    with open(input) as fin:
+        dataset = json.load(fin)
+    images = dataset['images']
+
+    results = {}
+    for img in images:
+        fn = img['filename']
+        results[fn] = [cap['raw'] for cap in img['sentences']]
+
+    with open(output, 'w') as fout:
+        for fn, captions in results.items():
+            fout.write(f'/data2/share/data/flickr30k-entities/flickr30k-images/{fn}:\t{captions}\n')
 
 def run_evaluate(config):
     print('[Run]: evaluate image-text pairs')
@@ -62,4 +84,6 @@ def run_evaluate(config):
     print(f'Average CLIP-score: {np.mean(all_scores)}')
 
 if __name__ == '__main__':
-    origin_clip_scores()
+    # convert_caption_format('/data2/share/data/flickr30k-entities/karpathy/dataset_flickr30k.json', '/data2/share/data/flickr30k-entities/captions.txt')
+    root = '/data1/private/mxy/projects/mmda/code/ViLT/CIP/tmp/coco'
+    sample_images(f'{root}/augment_results', f'{root}/sampled_images')

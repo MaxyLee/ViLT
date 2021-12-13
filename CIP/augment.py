@@ -115,6 +115,7 @@ def run_augment(config):
 
     def augmentation(i, keys):
         k = config['k']
+        num_sample = config['num_sample']
         inpaint_dir = config['inpaint_dir']
         output_dir = config['output_dir']
         th_matchscore = config['th_matchscore']
@@ -131,7 +132,7 @@ def run_augment(config):
                 cat = tgt_inst['attr']['category']
             else:
                 cat = tgt_inst['attr']['category']['name']
-            same_cat_instances = cat2ids[cat]
+            same_cat_instances = random.sample(cat2ids[cat], min(num_sample, len(cat2ids[cat])))
             for instance_key in same_cat_instances:
                 if t_cnt >= k:
                     break
@@ -147,12 +148,14 @@ def run_augment(config):
                     fout.write(f'{output_dir}/{template_key}-{instance_key}.jpg:\t{aug_captions}\n')
                     cnt += 1
                     t_cnt += 1
+            if cnt % 1000 == 0:
+                print(f'cnt: {cnt}')
         fout.close()
         return cnt
     
     print('augmentation')
     if num_processes == 1:
-        cnt = augmentation(0, templates.keys())
+        cnt = augmentation(0, list(templates.keys()))
     else:
         split_keys = np.array_split(list(templates.keys()), num_processes)
         cnts = Parallel(n_jobs=num_processes)(delayed(augmentation)(i, split_keys[i]) for i in range(num_processes))

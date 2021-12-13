@@ -44,13 +44,16 @@ def run_crop_inpaint(config):
     print('saving_images')
     os.makedirs(output_dir, exist_ok=True)
     for label, template in tqdm(templates.items(), desc='Save images and masks'):
-        shutil.copyfile(f"{image_path}/{template['imgid']:0>12d}.jpg", f'{output_dir}/{label}.png')
+        img_name = f"{template['imgid']}.jpg" if 'f30k' in output_dir else f"{template['imgid']:0>12d}.jpg"
+        shutil.copyfile(f"{image_path}/{img_name}", f'{output_dir}/{label}.png')
         # shutil.copyfile(f"{image_path}/{template['imgid']}.jpg", f'{output_dir}/{label}.png')
         img_size = template['img_size']
 
         mask = np.zeros(img_size, dtype=np.uint8)
-        x1, y1, x2, y2 = bbox2xy(template['bbox'])
-        # x1, y1, x2, y2 = template['bbox']
+        if 'f30k' in output_dir:
+            x1, y1, x2, y2 = template['bbox']
+        else:
+            x1, y1, x2, y2 = bbox2xy(template['bbox'])
         mask[y1:y2, x1:x2] = 255
         mask_image = Image.fromarray(mask)
         mask_image.save(f'{output_dir}/{label}_mask.png')

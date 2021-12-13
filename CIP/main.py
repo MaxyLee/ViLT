@@ -26,5 +26,5 @@ if __name__ == '__main__':
     # inst_desc_match_f30k(config['inst_desc_match_f30k'])
     # run_phrase_grounding(config['phrase_grounding'])
     # run_crop_inpaint(config['crop_inpaint'])
-    run_augment(config['augment'])
-    # run_evaluate(config['evaluate'])
+    # run_augment(config['augment'])
+    run_evaluate(config['evaluate'])

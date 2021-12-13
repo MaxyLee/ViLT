@@ -24,7 +24,7 @@ class F30KCIPDataset(BaseDataset):
         self.split = split
 
         if split == "train":
-            names = ["f30k_caption_karpathy_train", "f30k_caption_karpathy_val", "f30k_train_cip"]
+            names = ["f30k_caption_karpathy_train", "f30k_caption_karpathy_val", "f30k_train_cip_tree"]
         elif split == "val":
             names = ["f30k_caption_karpathy_test"]
         elif split == "test":

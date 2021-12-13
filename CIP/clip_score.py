@@ -28,7 +28,7 @@ class CLIPScore:
         if isinstance(texts, str):
             texts = [texts]
         texts = [re.sub('\s##|\[CLS\]|\[SEP\]', '', text).strip() for text in texts]
-        texts = clip.tokenize(texts).to(self.device)
+        texts = clip.tokenize(texts, truncate=True).to(self.device)
 
         if isinstance(images, (list, tuple)):
             images = torch.cat([self.single_image_preprocess(img) for img in images], dim=0)

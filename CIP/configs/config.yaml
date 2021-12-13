@@ -20,7 +20,7 @@ analysis:
   
 # data augmentation
 
-tmp_path: tmp/coco/
+tmp_path: tmp/f30k/
 
 experimental:
   inst_desc_match:
@@ -78,11 +78,14 @@ crop_inpaint:
     indir: ${crop_inpaint.template_path}
     outdir: ${tmp_path}/inpaint_images
     device: 
+      - cuda:4
+      - cuda:5
       - cuda:6
       - cuda:7
 
 augment:
   k: 1
+  num_sample: 5000
   seed: 18
   idm_dir: ${inst_desc_match.output_dir}
   inpaint_dir: ${crop_inpaint.inpaint.outdir}
@@ -93,6 +96,7 @@ augment:
 
 evaluate:
   data_dir: ${augment.output_dir}
+  # data_dir: /data2/share/data/flickr30k-entities/flickr30k-images
   output_path: ${augment.output_dir}/scores.txt
   device: 'cuda:4'
   batch_size: 100
