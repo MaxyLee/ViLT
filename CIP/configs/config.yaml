@@ -42,6 +42,13 @@ extract_tree:
   instance_annotation: /data2/share/data/coco/annotations/instances_train2017.json
   output_dir: tmp
 
+extract_tree_refcoco:
+  stanza_dir: /data2/private/cc/experiment/ViLT/CIP/checkpoints/stanza
+  dataroot: /data2/share/data/refcoco
+  dataset: refcoco
+  splitby: unc
+  output_dir: tmp
+
 inst_desc_match:
   word2vec: /data2/private/cc/wheels/GoogleNews-vectors-negative300.bin
   tree_path: ${extract_tree.output_dir}/id2tree.json
@@ -60,6 +67,13 @@ inst_desc_match:
 inst_desc_match_f30k:
   root: /data2/share/data/flickr30k-entities
   image_path: /data2/share/data/flickr30k-entities/flickr30k-images
+  output_dir: ${tmp_path}/idm_results
+  visualize: True
+
+inst_desc_match_refcoco:
+  dataroot: /data2/share/data/refcoco
+  dataset: refcoco
+  splitby: unc
   output_dir: ${tmp_path}/idm_results
 
 phrase_grounding:

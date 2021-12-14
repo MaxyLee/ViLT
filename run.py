@@ -19,7 +19,8 @@ def main(_config):
 
     os.makedirs(_config["log_dir"], exist_ok=True)
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        save_top_k=1,
+        # save_top_k=1,
+        every_n_epochs=1,
         verbose=True,
         monitor="val/the_metric",
         mode="max",

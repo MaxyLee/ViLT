@@ -147,7 +147,10 @@ class IDMAnn:
         return all_instances
 
     def draw_templates_image(self):
-        image = loadImage(self.image_path, self.imgid)
+        if 'coco' in self.image_path:
+            image = loadImage(self.image_path, self.imgid)
+        else:
+            image = Image.open(f'{self.image_path}/{self.imgid}.jpg')
         cnt = 0
         all_template_captions = []
         for template, color in zip(self.templates, colornames):
@@ -165,7 +168,10 @@ class IDMAnn:
         return template_image
 
     def draw_instances_image(self, min_height=200, masked=True):
-        image = loadImage(self.image_path, self.imgid)
+        if 'coco' in self.image_path:
+            image = loadImage(self.image_path, self.imgid)
+        else:
+            image = Image.open(f'{self.image_path}/{self.imgid}.jpg')
         all_instance_images = [image]
         for instance in self.instances:
             region = Image.fromarray(instance['region'])
@@ -281,6 +287,20 @@ def noun2np(tree):
 
 def location_parse(pos_tags):
     pass
+
+def inst_desc_match_refcoco(config, output_dir=None):
+    import sys
+    sys.path.append('/data1/private/mxy/projects/mmda/code/refer')
+    from refer import REFER
+    
+    print('[Run]: instance-description matching on refcoco')
+    dataroot = config['dataroot']
+    dataset = config['dataset']
+    splitby = config['splitby']
+
+    refer = REFER(dataroot, dataset, splitby)
+    import ipdb; ipdb.set_trace()
+
 
 def inst_desc_match_f30k(config, output_dir=None):
     print('[Run]: instance-description matching on f30k')
@@ -493,7 +513,9 @@ def f30k_template_captions(captions, phrase_id):
         sentence = cap['sentence']
         for phrase in cap['phrases']:
             if phrase['phrase_id'] == phrase_id:
-                sentence = sentence[:phrase['first_word_index']] + '[OBJ]' + sentence[phrase['first_word_index']+len(phrase['phrase']):]
+                # sentence = sentence[:phrase['first_word_index']] + '[OBJ]' + sentence[phrase['first_word_index']+len(phrase['phrase']):]
+                words = sentence.split(' ')
+                sentence = ' '.join(words[:phrase['first_word_index']] + ['[OBJ]'] + words[phrase['first_word_index']+len(phrase['phrase'].split(' ')):])
                 break
         annoted_captions.append(sentence)
     return annoted_captions
@@ -582,7 +604,7 @@ def load_idmanns(output_dir, return_anns=False, load_instances=True):
         tmp_key = keys[0]
         tmp_imgid = int(tmp_key.split('-')[0])
         tmp_templates = [templates[tmp_key]]
-        tmp_instances = [instances[tmp_key]]
+        tmp_instances = [instances[tmp_key]] if load_instances else []
         for key in keys[1:]:
             imgid = int(key.split('-')[0])
             if imgid != tmp_imgid:
@@ -606,4 +628,14 @@ if __name__ == '__main__':
     # output_dir = config['output_dir']
     # os.makedirs(output_dir, exist_ok=True)
     # save_idmanns(idmAnns, config, output_dir=output_dir)
-    inst_desc_match_f30k()
+    # inst_desc_match_f30k()
+    output_dir = '/data1/private/mxy/projects/mmda/code/ViLT/CIP/tmp/refcoco/idm_results'
+    idmAnns = load_idmanns(output_dir, return_anns=True, load_instances=False)
+    os.makedirs(f'{output_dir}/result_imgs', exist_ok=True)
+    idxs = random.sample(range(len(idmAnns)), 1000)
+    for idx in tqdm(idxs, desc='Draw Templates'):
+        idmAnn = idmAnns[idx]
+        template = idmAnn.draw_templates_image()
+        # instance = idmAnn.draw_instances_image()
+        # image = image_vcat([template, instance])
+        template.save(f'{output_dir}/result_imgs/{idmAnn.imgid}.png')
