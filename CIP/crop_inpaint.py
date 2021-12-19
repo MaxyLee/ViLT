@@ -44,7 +44,12 @@ def run_crop_inpaint(config):
     print('saving_images')
     os.makedirs(output_dir, exist_ok=True)
     for label, template in tqdm(templates.items(), desc='Save images and masks'):
-        img_name = f"{template['imgid']}.jpg" if 'f30k' in output_dir else f"{template['imgid']:0>12d}.jpg"
+        if 'f30k' in output_dir:
+            img_name = f"{template['imgid']}.jpg" 
+        elif 'refcoco' in output_dir:
+            img_name = f"COCO_train2014_{template['imgid']:0>12d}.jpg"
+        else: # coco
+            img_name = f"{template['imgid']:0>12d}.jpg"
         shutil.copyfile(f"{image_path}/{img_name}", f'{output_dir}/{label}.png')
         # shutil.copyfile(f"{image_path}/{template['imgid']}.jpg", f'{output_dir}/{label}.png')
         img_size = template['img_size']

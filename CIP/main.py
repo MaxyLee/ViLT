@@ -11,6 +11,7 @@ from phrase_grounding import run_phrase_grounding, run_segmentation
 from crop_inpaint import run_crop_inpaint
 from augment import run_augment
 from evaluate import run_evaluate
+from filtering import run_filter
 
 if __name__ == '__main__':
     config = OmegaConf.load('configs/config.yaml')
@@ -31,7 +32,8 @@ if __name__ == '__main__':
 
     # run_phrase_grounding(config['phrase_grounding'])
 
-    run_crop_inpaint(config['crop_inpaint'])
+    # run_crop_inpaint(config['crop_inpaint'])
     
     # run_augment(config['augment'])
     # run_evaluate(config['evaluate'])
+    run_filter(config['filter'])

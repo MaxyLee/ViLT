@@ -51,7 +51,7 @@ def inst_match_score(src_inst, tgt_inst, config):
 def augment_captions(template_captions, descs, size=5):
     sample_descs = [descs[idx] for idx in np.random.randint(0, len(descs), size=size)]
     sample_template_captions = [template_captions[idx] for idx in np.random.randint(0, len(template_captions), size=size)]
-    return [template_caption.replace('[OBJ]', desc) for desc, template_caption in zip(sample_descs, sample_template_captions)]
+    return [template_caption.replace('[OBJ]', desc) for desc, template_caption in zip(sample_descs, sample_template_captions) if '[OBJ]' in template_caption]
 
 def augment_template_with_instance(template, instance, image_filepath):
     image = Image.open(image_filepath)
@@ -89,6 +89,13 @@ def get_inst_scores(idm_dir, instances, cat2ids):
             pickle.dump(inst_scores, f)
     return inst_scores
 
+def get_inst_cat(inst, output_dir):
+    if 'f30k' in output_dir or 'refcoco' in output_dir:
+        cat = inst['attr']['category']
+    else:
+        cat = inst['attr']['category']['name']
+    return cat
+
 def test_fun(i, config):
     print(f'test function {i}')
     return i
@@ -105,10 +112,7 @@ def run_augment(config):
 
     cat2ids = defaultdict(list)
     for iid, ins in instances.items():
-        if 'f30k' in output_dir:
-            cat = ins['attr']['category']
-        else:
-            cat = ins['attr']['category']['name']
+        cat = get_inst_cat(ins, output_dir)
         cat2ids[cat].append(iid)
 
     os.makedirs(output_dir, exist_ok=True)
@@ -128,10 +132,8 @@ def run_augment(config):
             if template_key not in instances:
                 continue
             tgt_inst = instances[template_key]
-            if 'f30k' in output_dir:
-                cat = tgt_inst['attr']['category']
-            else:
-                cat = tgt_inst['attr']['category']['name']
+            cat = get_inst_cat(tgt_inst, output_dir)
+
             same_cat_instances = random.sample(cat2ids[cat], min(num_sample, len(cat2ids[cat])))
             for instance_key in same_cat_instances:
                 if t_cnt >= k:

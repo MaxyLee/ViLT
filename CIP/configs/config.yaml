@@ -20,7 +20,7 @@ analysis:
   
 # data augmentation
 
-tmp_path: tmp/f30k/
+tmp_path: tmp/f30k
 
 experimental:
   inst_desc_match:
@@ -65,16 +65,21 @@ inst_desc_match:
   visualize: True
 
 inst_desc_match_f30k:
-  root: /data2/share/data/flickr30k-entities
-  image_path: /data2/share/data/flickr30k-entities/flickr30k-images
+  root: /data/share/UNITER/origin_imgs/flickr30k
+  image_path: /data/share/UNITER/origin_imgs/flickr30k/flickr30k-images
   output_dir: ${tmp_path}/idm_results
   visualize: True
 
 inst_desc_match_refcoco:
-  dataroot: /data2/share/data/refcoco
-  dataset: refcoco
-  splitby: unc
+  image_path: /data/share/UNITER/origin_imgs/coco_original/train2014
+  dataroot: /data/share/data/refcoco
+  dataset: refcocog
+  splitby: umd
   output_dir: ${tmp_path}/idm_results
+  th_coverage: 
+    - 0.1
+    - 0.7
+  visualize: True
 
 phrase_grounding:
   image_path: /data2/share/data/coco/images/train2017
@@ -84,23 +89,21 @@ phrase_grounding:
   th_bbox_overlap: 0.8
 
 crop_inpaint:
-  template_annotation: ${inst_desc_match.output_dir}/templates.json
+  template_annotation: ${inst_desc_match_f30k.output_dir}/templates.json
   template_path: ${tmp_path}/origin_images
   inpaint:
-    code_path: /data2/private/cc/experiment/lama
-    model_path: /data2/private/cc/experiment/lama/big-lama
+    code_path: /data/private/cc/experiment/lama
+    model_path: /data/private/cc/experiment/lama/big-lama
     indir: ${crop_inpaint.template_path}
     outdir: ${tmp_path}/inpaint_images
     device: 
       - cuda:4
       - cuda:5
-      - cuda:6
-      - cuda:7
 
 augment:
-  k: 1
-  num_sample: 5000
+  k: 2
   seed: 18
+  num_sample: 1000
   idm_dir: ${inst_desc_match.output_dir}
   inpaint_dir: ${crop_inpaint.inpaint.outdir}
   # inpaint_dir: ${crop_inpaint.template_path}
@@ -114,3 +117,7 @@ evaluate:
   output_path: ${augment.output_dir}/scores.txt
   device: 'cuda:4'
   batch_size: 100
+
+filter:
+  data_dir: ${augment.output_dir}
+  clip_th: 27.0

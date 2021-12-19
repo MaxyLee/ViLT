@@ -146,11 +146,55 @@ class IDMAnn:
             all_instances.append(instance)
         return all_instances
 
-    def draw_templates_image(self):
+    @classmethod
+    def from_refcoco_anns(cls, image_path, ref, img, ann, mask):
+        all_templates = cls.get_refcoco_templates(ref, img, ann)
+        all_instances = cls.get_refcoco_instances(image_path, ref, img, ann, mask)
+
+        return cls(image_path, ref['image_id'], all_templates, all_instances)
+
+    @classmethod
+    def get_refcoco_templates(cls, ref, img, ann):
+        img_size = (img['height'], img['width'])
+        template = {
+            'imgid': ref['image_id'],
+            'inst_id': ref['ann_id'],
+            'bbox': ann['bbox'], # use first bbox
+            'img_size': img_size,
+            'object_template_captions': refcoco_template_captions(ref['sentences'])
+        }
+        return [template]
+
+    @classmethod
+    def get_refcoco_instances(cls, image_path, ref, img, ann, mask):
+        image = Image.open(f"{image_path}/{img['file_name']}")
+        x1, y1, x2, y2 = bbox2xy(ann['bbox'])
+        region = image.crop((x1, y1, x2, y2))
+        mask = mask['mask'][y1:y2, x1:x2]
+        all_descs = [s['sent'] for s in ref['sentences']]
+        instance = {
+            'id': ref['ann_id'],
+            'region': np.array(region),
+            'mask': mask,
+            'object_descs': all_descs, # ['a dog', 'a small puppy']
+            'subject_descs': None,     # ['a dog jumping', 'a small puppy playing with a frisbee']
+            'attr': {
+                'category': ref['category_id'], # {supercategory, ..}
+                'vbg': None
+            }
+        }
+        return [instance]
+
+    def get_image(self):
         if 'coco' in self.image_path:
-            image = loadImage(self.image_path, self.imgid)
+            fmt = '{imgid:0>12d}.jpg' if '2017' in self.image_path else 'COCO_train2014_{imgid:0>12d}.jpg'
+            image = loadImage(self.image_path, self.imgid, fmt=fmt)
         else:
             image = Image.open(f'{self.image_path}/{self.imgid}.jpg')
+        return image
+
+    def draw_templates_image(self):
+        image = self.get_image()
         cnt = 0
         all_template_captions = []
         for template, color in zip(self.templates, colornames):
@@ -168,10 +212,7 @@ class IDMAnn:
         return template_image
 
     def draw_instances_image(self, min_height=200, masked=True):
-        if 'coco' in self.image_path:
-            image = loadImage(self.image_path, self.imgid)
-        else:
-            image = Image.open(f'{self.image_path}/{self.imgid}.jpg')
+        image = self.get_image()
         all_instance_images = [image]
         for instance in self.instances:
             region = Image.fromarray(instance['region'])
@@ -290,16 +331,36 @@ def location_parse(pos_tags):
 
 def inst_desc_match_refcoco(config, output_dir=None):
     import sys
-    sys.path.append('/data1/private/mxy/projects/mmda/code/refer')
+    sys.path.append('/data/private/mxy/code/refer')
     from refer import REFER
     
     print('[Run]: instance-description matching on refcoco')
     dataroot = config['dataroot']
     dataset = config['dataset']
     splitby = config['splitby']
+    image_path = config['image_path']
+    th_coverage = config.get('th_coverage', [0.1, 0.7])
 
     refer = REFER(dataroot, dataset, splitby)
-    import ipdb; ipdb.set_trace()
+    ref_ids = refer.getRefIds(split='train')
+
+    idmAnns = []
+    for refid in tqdm(ref_ids, desc='Get Templates'):
+        ref = refer.Refs[refid]
+        img = refer.Imgs[ref['image_id']]
+        ann = refer.refToAnn[refid]
+        mask = refer.getMask(ref)
+
+        img_area = img['height'] * img['width']
+        box_area = ann['bbox'][2] * ann['bbox'][3]
+        coverage = float(box_area) / img_area
+
+        if coverage > th_coverage[0] and coverage < th_coverage[1]:
+            idmAnn = IDMAnn.from_refcoco_anns(image_path, ref, img, ann, mask)
+            idmAnns.append(idmAnn)
+
+    save(idmAnns, config, output_dir)
+    return idmAnns
 
 
 def inst_desc_match_f30k(config, output_dir=None):
@@ -337,24 +398,7 @@ def inst_desc_match_f30k(config, output_dir=None):
         idmAnn = IDMAnn.from_f30k_anns(img_path, imgid, caps, anns, segm)
         idmAnns.append(idmAnn)
     
-    if output_dir is not None:
-        os.makedirs(output_dir, exist_ok=True)
-        save_idmanns(idmAnns, config, output_dir=output_dir)
-    elif 'output_dir' in config:
-        output_dir = config['output_dir']
-        os.makedirs(output_dir, exist_ok=True)
-        save_idmanns(idmAnns, config, output_dir=output_dir)
-
-    if config.get('visualize', False):
-        os.makedirs(f'{output_dir}/result_imgs', exist_ok=True)
-        idxs = random.sample(range(len(idmAnns)), 1000)
-        for idx in tqdm(idxs, desc='Draw Templates'):
-            idmAnn = idmAnns[idx]
-            template = idmAnn.draw_templates_image()
-            instance = idmAnn.draw_instances_image()
-            image = image_vcat([template, instance])
-            image.save(f'{output_dir}/result_imgs/{idmAnn.imgid}.png')
-
+    save(idmAnns, config, output_dir)
     return idmAnns
 
 def run_inst_desc_match(config, output_dir=None):
@@ -486,26 +530,15 @@ def run_inst_desc_match(config, output_dir=None):
             import ipdb; ipdb.set_trace()
         idmAnns.append(idmAnn)
 
-    if output_dir is not None:
-        os.makedirs(output_dir, exist_ok=True)
-        save_idmanns(idmAnns, config, output_dir=output_dir)
-    elif 'output_dir' in config:
-        output_dir = config['output_dir']
-        os.makedirs(output_dir, exist_ok=True)
-        save_idmanns(idmAnns, config, output_dir=output_dir)
-
-    if config.get('visualize', False):
-        os.makedirs(f'{output_dir}/result_imgs', exist_ok=True)
-        idxs = random.sample(range(len(idmAnns)), 1000)
-        for idx in tqdm(idxs, desc='Draw Templates'):
-            idmAnn = idmAnns[idx]
-            template = idmAnn.draw_templates_image()
-            instance = idmAnn.draw_instances_image()
-            image = image_vcat([template, instance])
-            image.save(f'{output_dir}/result_imgs/{idmAnn.imgid}.png')
+    save(idmAnns, config, output_dir)
     return idmAnns
 
 ############# Visualization Functions #############
+
+def refcoco_template_captions(sentences):
+    #TODO
+    return ['[OBJ]'] * len(sentences)
+
 
 def f30k_template_captions(captions, phrase_id):
     annoted_captions = []
@@ -620,6 +653,25 @@ def load_idmanns(output_dir, return_anns=False, load_instances=True):
     else:
         return templates, instances, config
 
+def save(idmAnns, config, output_dir=None):
+    if output_dir is not None:
+        os.makedirs(output_dir, exist_ok=True)
+        save_idmanns(idmAnns, config, output_dir=output_dir)
+    elif 'output_dir' in config:
+        output_dir = config['output_dir']
+        os.makedirs(output_dir, exist_ok=True)
+        save_idmanns(idmAnns, config, output_dir=output_dir)
+
+    if config.get('visualize', False):
+        os.makedirs(f'{output_dir}/result_imgs', exist_ok=True)
+        idxs = random.sample(range(len(idmAnns)), 1000)
+        for idx in tqdm(idxs, desc='Draw Templates'):
+            idmAnn = idmAnns[idx]
+            template = idmAnn.draw_templates_image()
+            instance = idmAnn.draw_instances_image()
+            image = image_vcat([template, instance])
+            image.save(f'{output_dir}/result_imgs/{idmAnn.imgid}.png')
+
 if __name__ == '__main__':
     # args = parse_args()
     # config = OmegaConf.load(args.config)
@@ -629,13 +681,27 @@ if __name__ == '__main__':
     # os.makedirs(output_dir, exist_ok=True)
     # save_idmanns(idmAnns, config, output_dir=output_dir)
     # inst_desc_match_f30k()
-    output_dir = '/data1/private/mxy/projects/mmda/code/ViLT/CIP/tmp/refcoco/idm_results'
-    idmAnns = load_idmanns(output_dir, return_anns=True, load_instances=False)
-    os.makedirs(f'{output_dir}/result_imgs', exist_ok=True)
-    idxs = random.sample(range(len(idmAnns)), 1000)
-    for idx in tqdm(idxs, desc='Draw Templates'):
-        idmAnn = idmAnns[idx]
-        template = idmAnn.draw_templates_image()
-        # instance = idmAnn.draw_instances_image()
-        # image = image_vcat([template, instance])
-        template.save(f'{output_dir}/result_imgs/{idmAnn.imgid}.png')
+    import sys
+    sys.path.append('/data/private/mxy/code/refer')
+    from refer import REFER
+    
+    print('[Run]: instance-description matching on refcoco')
+    dataroot = '/data/share/data/refcoco'
+    dataset = 'refcoco'
+    splitby = 'unc'
+
+    refer = REFER(dataroot, dataset, splitby)
+
+    ref_ids = refer.getRefIds(split='train')
+
+    # for refid in ref_ids:
+    #     ref = refer.Refs[refid]
+    #     sents = [s['sent'] for s in ref['sentences']]
+    #     if 'wine' in sents:
+    #         print(ref)
+    refid = 45501
+    ref = refer.Refs[refid]
+    img = refer.Imgs[ref['image_id']]
+    ann = refer.refToAnn[refid]
+    mask = refer.getMask(ref)
+    import ipdb; ipdb.set_trace()

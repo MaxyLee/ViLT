@@ -111,6 +111,7 @@ def plot_results_plt(pil_img, scores, boxes, labels, masks=None, fn='result'):
     plt.imshow(np_image)
     plt.axis('off')
     plt.savefig(fn)
+    plt.close()
 
 def plot_results(pil_img, scores, boxes, labels, masks=None, caption=None, fn='result'):
     # plt.figure(figsize=(16,10))
@@ -263,6 +264,19 @@ def get_overlap(bbox1, bbox2):
 
     return (x_right - x_left) * (y_bottom - y_top)
 
+def merge_boxes(boxes, size):
+    bbox = [size[0], size[1], 0, 0]
+    for box in boxes:
+        if box[0] < bbox[0]:
+            bbox[0] = box[0]
+        if box[1] < bbox[1]:
+            bbox[1] = box[1]
+        if box[2] > bbox[2]:
+            bbox[2] = box[2]
+        if box[3] > bbox[3]:
+            bbox[3] = box[3]
+    return tuple(bbox)
+
 def run_phrase_grounding(config, output_dir=None):
     print('[Run]: phrase grounding')
 
@@ -406,8 +420,8 @@ def run_segmentation(config, output_dir=None):
     model_pc = model_pc.cuda()
     model_pc.eval()
 
-    imgids = ['4797050581', '3923857105', '2652311904']
-    for imgid in tqdm(imgids):
+    # imgids = ['4797050581', '3923857105', '2652311904']
+    for imgid in tqdm(imgids[:50]):
         img = Image.open(f'{img_path}/{imgid}.jpg')
         anns = get_annotations(f'{ann_path}/{imgid}.xml')
         caps = get_sentence_data(f'{cap_path}/{imgid}.txt')
@@ -418,20 +432,25 @@ def run_segmentation(config, output_dir=None):
             segm = {}
             for p in cap['phrases']:
                 if p['phrase_id'] in phrase_ids:
+                    bbox = merge_boxes(anns['boxes'][p['phrase_id']], img.size)
+                    crop_img = img.crop(bbox)
+
                     scores, boxes, labels, masks = inference_segmentation(img, p['phrase'].lower(), model_pc)
+                    plot_results_plt(img, scores, boxes, labels, masks, fn=f"tmp/test/whole_image-{imgid}-{p['phrase_id']}")
+                    scores, boxes, labels, masks = inference_segmentation(crop_img, p['phrase'].lower(), model_pc)
+                    plot_results_plt(crop_img, scores, boxes, labels, masks, fn=f"tmp/test/crop_image-{imgid}-{p['phrase_id']}")
                     segm[p['phrase_id']] = {
                         'scores': scores,
                         'boxes': boxes,
                         'labels': labels,
                         'masks': masks
                     }
-            segms.append(segm)
-        import ipdb; ipdb.set_trace()
                     # import ipdb; ipdb.set_trace()
-                # plot_results_plt(img, scores, boxes, labels, masks, fn='tmp/test')
-        # with open(f'{output_dir}/{imgid}.json', 'w') as f:
-        #     json.dump(segm, f)
-        torch.save(segm, f'{output_dir}/{imgid}')
+            segms.append(segm)
+        
+                    # import ipdb; ipdb.set_trace()
+        
+        # torch.save(segm, f'{output_dir}/{imgid}')
                     
 
 
